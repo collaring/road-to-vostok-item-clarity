@@ -34,6 +34,20 @@ func _ready() -> void:
 		"category" = "General"
 	})
 
+	_config.set_value("Dropdown", "taskMarkerCorner", {
+		"name"    = "Task Marker Corner",
+		"tooltip" = "Which corner to place the '!' task marker on items needed for active tasks.",
+		"default" = 0,
+		"value"   = 0,
+		"options" = [
+			"Bottom Right",
+			"Bottom Left",
+			"Top Right",
+			"Top Left"
+		],
+		"category" = "General"
+	})
+
 	_config.set_value("Bool", "recipeTooltip", {
 		"name"     = "Show Crafting Recipes in Tooltip",
 		"tooltip"  = "Shows which crafting recipes use this item as an ingredient when hovering it in the inventory.",

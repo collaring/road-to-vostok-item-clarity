@@ -123,8 +123,9 @@ func _read_config() -> Dictionary:
 	var result = {
 		"category_enabled": true,
 		"rarity_enabled":   false,
-		"task_marking":     true,
-		"recipe_tooltip":   true,
+		"task_marking":       true,
+		"recipe_tooltip":     true,
+		"task_marker_corner": 0,
 		"cat_colors": {
 			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
 			"Armor":       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
@@ -159,8 +160,9 @@ func _read_config() -> Dictionary:
 		return result
 	result["category_enabled"] = _get_bool(cfg, "Bool", "categoryColorCoding", true)
 	result["rarity_enabled"]   = _get_bool(cfg, "Bool", "rarityColorCoding",   false)
-	result["task_marking"]     = _get_bool(cfg, "Bool", "taskMarking",         true)
-	result["recipe_tooltip"]   = _get_bool(cfg, "Bool", "recipeTooltip",       true)
+	result["task_marking"]       = _get_bool(cfg, "Bool", "taskMarking",         true)
+	result["recipe_tooltip"]     = _get_bool(cfg, "Bool", "recipeTooltip",       true)
+	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    0)
 	result["cat_colors"] = {
 		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
 		"Armor":       _get_color(cfg, "Color", "catArmor",       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
@@ -189,6 +191,12 @@ func _read_config() -> Dictionary:
 		2: _get_color(cfg, "Color", "rarLegendary", Color(1.00, 0.65, 0.00, DEFAULT_OPACITY)),
 	}
 	return result
+
+
+func _get_int(cfg: ConfigFile, section: String, key: String, default: int) -> int:
+	var v = cfg.get_value(section, key, default)
+	if v is Dictionary: return int(v.get("value", default))
+	return int(v)
 
 
 func _get_bool(cfg: ConfigFile, section: String, key: String, default: bool) -> bool:
@@ -440,12 +448,33 @@ func apply_task_icon(item: Node) -> void:
 	circle_style.content_margin_left  = 3
 	circle_style.content_margin_right = 3
 	icon_label.add_theme_stylebox_override("normal", circle_style)
-	# Position: bottom-right corner, nudged up and right slightly
-	icon_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	icon_label.offset_left = -18
-	icon_label.offset_top = -20
-	icon_label.offset_right = 2
-	icon_label.offset_bottom = -2
+	# Position: configurable corner
+	var corner: int = _conf.get("task_marker_corner", 0)
+	match corner:
+		1: # Bottom Left
+			icon_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+			icon_label.offset_left = -2
+			icon_label.offset_top = -20
+			icon_label.offset_right = 18
+			icon_label.offset_bottom = -2
+		2: # Top Right
+			icon_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			icon_label.offset_left = -18
+			icon_label.offset_top = 2
+			icon_label.offset_right = 2
+			icon_label.offset_bottom = 20
+		3: # Top Left
+			icon_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			icon_label.offset_left = -2
+			icon_label.offset_top = 2
+			icon_label.offset_right = 18
+			icon_label.offset_bottom = 20
+		_: # Bottom Right (default, 0)
+			icon_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+			icon_label.offset_left = -18
+			icon_label.offset_top = -20
+			icon_label.offset_right = 2
+			icon_label.offset_bottom = -2
 	item.add_child(icon_label)
 
 	# Invisible full-rect hover zone  Ecovers the whole item slot so hovering
