@@ -7,7 +7,10 @@ const CONFIG_PATH = "user://MCM/ItemClarity/config.ini"
 
 # task_needed_paths: resource_path -> Array[String] of formatted lines like "x2 for Gunsmith: Warm Meal"
 var _task_needed_paths: Dictionary = {}
+# crafting_recipe_paths: resource_path -> Array[String] of recipe names that use this item as ingredient
+var _crafting_recipe_paths: Dictionary = {}
 var _tooltip_quest_label: Label = null
+var _tooltip_recipe_label: Label = null
 var _hovered_item_key: String = ""
 
 # Cached config — loaded once on ready, refreshed by MCM on save
@@ -30,6 +33,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_conf = _read_config()
 	_load_task_data()
+	_load_recipe_data()
 	_scan_existing_items()
 	_find_and_setup_tooltip(get_tree().get_root())
 	get_tree().node_added.connect(_on_node_added)
@@ -43,25 +47,30 @@ func _ready() -> void:
 
 func _on_node_added(node: Node) -> void:
 	if not _is_item_node(node):
-		# Check if it's the Tooltip node  Ehook our quest label into it
 		if node.name == "Tooltip" and node is Control:
 			node.ready.connect(_setup_tooltip_label.bind(node), CONNECT_ONE_SHOT)
+		elif node.name == "Interface" and "tooltipDelay" in node:
+			_apply_tooltip_delay(node)
 		return
 	if node.is_node_ready():
 		apply_color_to_item(node)
 		apply_task_icon(node)
+		apply_recipe_hover(node)
 	else:
 		node.ready.connect(func():
 			apply_color_to_item(node)
 			apply_task_icon(node)
+			apply_recipe_hover(node)
 		, CONNECT_ONE_SHOT)
 
 
 func _on_rescan_timer() -> void:
 	# Only reload task data — scene tree is already handled by node_added signal
 	_load_task_data()
-	if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label):
+	if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label) \
+			or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label):
 		_tooltip_quest_label = null
+		_tooltip_recipe_label = null
 		_find_and_setup_tooltip(get_tree().get_root())
 
 
@@ -80,19 +89,32 @@ func refresh_all_slots() -> void:
 	_conf = _read_config()
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
+	_load_recipe_data()
 	_scan_existing_items()
+	var interface = get_node_or_null("/root/Map/Core/UI/Interface")
+	if interface and "tooltipDelay" in interface:
+		_apply_tooltip_delay(interface)
+
+
+func _apply_tooltip_delay(interface: Node) -> void:
+	var cfg = ConfigFile.new()
+	var delay: float = 0.1
+	if cfg.load(CONFIG_PATH) == OK:
+		var v = cfg.get_value("Float", "tooltipDelay", 0.1)
+		delay = float(v.get("value", 0.1) if v is Dictionary else v)
+	interface.tooltipDelay = delay
 
 
 func _remove_all_overlays(node: Node) -> void:
 	var existing = node.get_node_or_null(OVERLAY_NODE_NAME)
 	if existing:
-		existing.queue_free()
+		existing.free()
 	var existing_icon = node.get_node_or_null(TASK_ICON_NODE_NAME)
 	if existing_icon:
-		existing_icon.queue_free()
+		existing_icon.free()
 	var existing_hover = node.get_node_or_null("_icc_hover")
 	if existing_hover:
-		existing_hover.queue_free()
+		existing_hover.free()
 	for child in node.get_children():
 		_remove_all_overlays(child)
 
@@ -102,6 +124,7 @@ func _read_config() -> Dictionary:
 		"category_enabled": true,
 		"rarity_enabled":   false,
 		"task_marking":     true,
+		"recipe_tooltip":   true,
 		"cat_colors": {
 			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
 			"Armor":       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
@@ -116,7 +139,7 @@ func _read_config() -> Dictionary:
 			"Grenades":    Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
 			"Helmets":     Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
 			"Instruments": Color(0.0,  0.0,  0.0,  0.0),
-			"Keys":        Color(0.85, 0.70, 0.00, DEFAULT_OPACITY),
+			"Keys":        Color(0.95, 0.40, 0.70, DEFAULT_OPACITY),
 			"Knives":      Color(0.25, 0.25, 0.25, DEFAULT_OPACITY),
 			"Lore":        Color(0.0,  0.0,  0.0,  0.0),
 			"Medical":     Color(0.85, 0.10, 0.10, DEFAULT_OPACITY),
@@ -137,6 +160,7 @@ func _read_config() -> Dictionary:
 	result["category_enabled"] = _get_bool(cfg, "Bool", "categoryColorCoding", true)
 	result["rarity_enabled"]   = _get_bool(cfg, "Bool", "rarityColorCoding",   false)
 	result["task_marking"]     = _get_bool(cfg, "Bool", "taskMarking",         true)
+	result["recipe_tooltip"]   = _get_bool(cfg, "Bool", "recipeTooltip",       true)
 	result["cat_colors"] = {
 		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
 		"Armor":       _get_color(cfg, "Color", "catArmor",       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
@@ -151,7 +175,7 @@ func _read_config() -> Dictionary:
 		"Grenades":    _get_color(cfg, "Color", "catGrenades",    Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
 		"Helmets":     _get_color(cfg, "Color", "catHelmets",     Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
 		"Instruments": _get_color(cfg, "Color", "catInstruments", Color(0.0,  0.0,  0.0,  0.0)),
-		"Keys":        _get_color(cfg, "Color", "catKeys",        Color(0.85, 0.70, 0.00, DEFAULT_OPACITY)),
+		"Keys":        _get_color(cfg, "Color", "catKeys",        Color(0.95, 0.40, 0.70, DEFAULT_OPACITY)),
 		"Knives":      _get_color(cfg, "Color", "catKnives",      Color(0.25, 0.25, 0.25, DEFAULT_OPACITY)),
 		"Lore":        _get_color(cfg, "Color", "catLore",        Color(0.0,  0.0,  0.0,  0.0)),
 		"Medical":     _get_color(cfg, "Color", "catMedical",     Color(0.85, 0.10, 0.10, DEFAULT_OPACITY)),
@@ -236,12 +260,77 @@ func _walk_and_color(node: Node) -> void:
 	if _is_item_node(node):
 		apply_color_to_item(node)
 		apply_task_icon(node)
+		apply_recipe_hover(node)
 	for child in node.get_children():
 		_walk_and_color(child)
 
 
 func _is_item_node(node: Node) -> bool:
 	return ("slotData" in node) and (node is Panel)
+
+
+# ── Recipe tracking ──────────────────────────────────────────────────────────
+
+func _load_recipe_data() -> void:
+	_crafting_recipe_paths = {}
+	if not _conf.get("recipe_tooltip", true):
+		return
+	var recipes_res = load("res://Crafting/Recipes.tres")
+	if recipes_res == null:
+		return
+	# Recipes.tres stores recipes in per-category properties (not a single array):
+	# consumables, electronics, equipment, furniture, medical, misc, weapons
+	const CATEGORY_PROPS = ["consumables", "electronics", "equipment", "furniture", "medical", "misc", "weapons"]
+	for cat_prop in CATEGORY_PROPS:
+		if not (cat_prop in recipes_res):
+			continue
+		var recipe_list = recipes_res.get(cat_prop)
+		if recipe_list == null:
+			continue
+		for recipe in recipe_list:
+			if recipe == null:
+				continue
+			# Skip weapon repair recipes
+			var is_repair: bool = recipe.get("repair") if "repair" in recipe else false
+			if is_repair:
+				continue
+			var recipe_name: String = recipe.get("name") if "name" in recipe else ""
+			var inputs = recipe.get("input") if "input" in recipe else null
+			if inputs == null or recipe_name == "":
+				continue
+			for ingredient in inputs:
+				if ingredient == null:
+					continue
+				var key: String = ingredient.resource_path
+				if key == "":
+					continue
+				if key not in _crafting_recipe_paths:
+					_crafting_recipe_paths[key] = []
+				if recipe_name not in _crafting_recipe_paths[key]:
+					_crafting_recipe_paths[key].append(recipe_name)
+
+
+func apply_recipe_hover(item: Node) -> void:
+	if not _conf.get("recipe_tooltip", true):
+		return
+	if not "slotData" in item or item.slotData == null:
+		return
+	if item.slotData.itemData == null:
+		return
+	var key: String = item.slotData.itemData.resource_path
+	if not _crafting_recipe_paths.has(key):
+		return
+	# Reuse the existing hover zone if already added by apply_task_icon,
+	# otherwise we need our own hover connection
+	var hover_zone = item.get_node_or_null("_icc_hover")
+	if hover_zone == null:
+		hover_zone = Control.new()
+		hover_zone.name = "_icc_hover"
+		hover_zone.mouse_filter = Control.MOUSE_FILTER_PASS
+		hover_zone.set_anchors_preset(Control.PRESET_FULL_RECT)
+		item.add_child(hover_zone)
+		hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(key))
+		hover_zone.mouse_exited.connect(_on_task_item_mouse_exited)
 
 
 # ── Task tracking ─────────────────────────────────────────────────────────────
@@ -379,50 +468,74 @@ func _on_task_item_mouse_exited() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _tooltip_quest_label == null:
-		return
-	if not is_instance_valid(_tooltip_quest_label):
-		_tooltip_quest_label = null
+	if _tooltip_quest_label == null and _tooltip_recipe_label == null:
 		return
 	# Walk up: Label -> Elements (VBox) -> Margin -> Panel -> Tooltip (Control)
-	var tooltip_root = _tooltip_quest_label.get_parent().get_parent().get_parent().get_parent()
-	if not is_instance_valid(tooltip_root):
-		_tooltip_quest_label.visible = false
+	var ref_label = _tooltip_quest_label if _tooltip_quest_label != null else _tooltip_recipe_label
+	if not is_instance_valid(ref_label):
+		_tooltip_quest_label = null
+		_tooltip_recipe_label = null
 		return
-	if not tooltip_root.visible:
-		_tooltip_quest_label.visible = false
-		return
-	var task_info: Array = _task_needed_paths.get(_hovered_item_key, [])
-	if task_info.is_empty():
-		_tooltip_quest_label.visible = false
-	else:
-		_tooltip_quest_label.text = "Needed for tasks:\n" + "\n".join(task_info)
-		_tooltip_quest_label.visible = true
+	var tooltip_root = ref_label.get_parent().get_parent().get_parent().get_parent()
+	var tooltip_visible = is_instance_valid(tooltip_root) and tooltip_root.visible
+	if _tooltip_quest_label != null and is_instance_valid(_tooltip_quest_label):
+		if not tooltip_visible:
+			_tooltip_quest_label.visible = false
+		else:
+			var task_info: Array = _task_needed_paths.get(_hovered_item_key, [])
+			if task_info.is_empty():
+				_tooltip_quest_label.visible = false
+			else:
+				_tooltip_quest_label.text = "Needed for tasks:\n" + "\n".join(task_info)
+				_tooltip_quest_label.visible = true
+	if _tooltip_recipe_label != null and is_instance_valid(_tooltip_recipe_label):
+		if not tooltip_visible:
+			_tooltip_recipe_label.visible = false
+		else:
+			var recipe_info: Array = _crafting_recipe_paths.get(_hovered_item_key, [])
+			if recipe_info.is_empty() or not _conf.get("recipe_tooltip", true):
+				_tooltip_recipe_label.visible = false
+			else:
+				_tooltip_recipe_label.text = "Used in crafting:\n" + "\n".join(recipe_info)
+				_tooltip_recipe_label.visible = true
 
 
 func _setup_tooltip_label(tooltip: Node) -> void:
-	if _tooltip_quest_label != null:
+	if _tooltip_quest_label != null and _tooltip_recipe_label != null:
 		return
 
 	var vbox = tooltip.get_node_or_null("Panel/Margin/Elements")
 	if vbox == null:
 		return
 
-	var label = Label.new()
-	label.name = "_icc_quest_label"
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.custom_minimum_size = Vector2(256.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.0))  # Gold
-	label.visible = false
-
-	# Insert after the "Info" node if it exists, otherwise just append
 	var info_node = vbox.get_node_or_null("Info")
-	vbox.add_child(label)
-	if info_node:
-		vbox.move_child(label, info_node.get_index() + 1)
+	var insert_after_idx = info_node.get_index() if info_node else vbox.get_child_count() - 1
 
-	_tooltip_quest_label = label
+	if _tooltip_quest_label == null:
+		var quest_label = Label.new()
+		quest_label.name = "_icc_quest_label"
+		quest_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		quest_label.custom_minimum_size = Vector2(256.0, 0.0)
+		quest_label.add_theme_font_size_override("font_size", 12)
+		quest_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.0))  # Gold
+		quest_label.visible = false
+		vbox.add_child(quest_label)
+		if info_node:
+			vbox.move_child(quest_label, insert_after_idx + 1)
+		_tooltip_quest_label = quest_label
+		insert_after_idx += 1
+
+	if _tooltip_recipe_label == null:
+		var recipe_label = Label.new()
+		recipe_label.name = "_icc_recipe_label"
+		recipe_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		recipe_label.custom_minimum_size = Vector2(256.0, 0.0)
+		recipe_label.add_theme_font_size_override("font_size", 12)
+		recipe_label.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0))  # Light blue
+		recipe_label.visible = false
+		vbox.add_child(recipe_label)
+		vbox.move_child(recipe_label, insert_after_idx + 1)
+		_tooltip_recipe_label = recipe_label
 
 
 func _dump_children(node: Node, depth: int) -> String:

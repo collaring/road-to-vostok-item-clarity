@@ -34,6 +34,14 @@ func _ready() -> void:
 		"category" = "General"
 	})
 
+	_config.set_value("Bool", "recipeTooltip", {
+		"name"     = "Show Crafting Recipes in Tooltip",
+		"tooltip"  = "Shows which crafting recipes use this item as an ingredient when hovering it in the inventory.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
 	_config.set_value("Float", "tooltipDelay", {
 		"name"     = "Tooltip Delay (seconds)",
 		"tooltip"  = "How long to hover an item before its tooltip appears. Default game value is 0.5.",
@@ -167,8 +175,8 @@ func _ready() -> void:
 	_config.set_value("Color", "catKeys", {
 		"name"       = "Category-Keys",
 		"tooltip"    = "Tint color for Key items. Set alpha to 0 to disable.",
-		"default"    = Color(0.85, 0.70, 0.00, 0.15),
-		"value"      = Color(0.85, 0.70, 0.00, 0.15),
+		"default"    = Color(0.95, 0.40, 0.70, 0.15),
+		"value"      = Color(0.95, 0.40, 0.70, 0.15),
 		"allowAlpha" = true,
 		"category"   = "Category Colors"
 	})
