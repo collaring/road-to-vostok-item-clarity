@@ -15,6 +15,8 @@ var _hovered_item_key: String = ""
 
 # Cached config — loaded once on ready, refreshed by MCM on save
 var _conf: Dictionary = {}
+var _traders_mtime: int = -1      # last-seen modification time of Traders.tres
+var _traders_os_path: String = "" # resolved OS path cached at startup
 
 # All category and rarity colors are now read from MCM config.
 # Defaults (alpha baked in at 0.15) are used when no config file exists.
@@ -32,6 +34,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_conf = _read_config()
+	_traders_os_path = ProjectSettings.globalize_path("user://Traders.tres")
+	_traders_mtime = FileAccess.get_modified_time(_traders_os_path)
 	_load_task_data()
 	_load_recipe_data()
 	_scan_existing_items()
@@ -39,7 +43,7 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 	# Slow timer: refreshes task completion state (e.g. after finishing a task)
 	var timer = Timer.new()
-	timer.wait_time = 3.0
+	timer.wait_time = 5.0
 	timer.autostart = true
 	timer.timeout.connect(_on_rescan_timer)
 	add_child(timer)
@@ -65,15 +69,20 @@ func _on_node_added(node: Node) -> void:
 
 
 func _on_rescan_timer() -> void:
+	var mtime: int = FileAccess.get_modified_time(_traders_os_path)
+	if mtime == _traders_mtime:
+		# File unchanged — skip expensive reload entirely
+		if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label) \
+				or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label):
+			_tooltip_quest_label = null
+			_tooltip_recipe_label = null
+			_find_and_setup_tooltip(get_tree().get_root())
+		return
+	_traders_mtime = mtime
 	var old_paths = _task_needed_paths.duplicate()
 	_load_task_data()
 	if _task_needed_paths != old_paths:
 		_scan_existing_items()
-	if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label) \
-			or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label):
-		_tooltip_quest_label = null
-		_tooltip_recipe_label = null
-		_find_and_setup_tooltip(get_tree().get_root())
 
 
 func _find_and_setup_tooltip(node: Node) -> void:
