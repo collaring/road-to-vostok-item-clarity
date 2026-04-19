@@ -10,19 +10,16 @@ func _ready() -> void:
 	var _config = ConfigFile.new()
 
 	# ── General ───────────────────────────────────────────────────────────────
-	_config.set_value("Bool", "categoryColorCoding", {
-		"name"     = "Color Coding - Category",
-		"tooltip"  = "Color items by category (Medical, Ammo, Weapons, etc.). Takes priority over rarity coding.",
-		"default"  = true,
-		"value"    = true,
-		"category" = "General"
-	})
-
-	_config.set_value("Bool", "rarityColorCoding", {
-		"name"     = "Color Coding - Rarity",
-		"tooltip"  = "Color items by rarity (Common, Rare, Legendary). Used when category coding is off or the item has no known category color.",
-		"default"  = false,
-		"value"    = false,
+	_config.set_value("Dropdown", "colorCodingMode", {
+		"name"    = "Color Coding",
+		"tooltip" = "How to color-code items in your inventory. Category takes priority and uses the colors below. Rarity uses the rarity colors. None disables color coding.",
+		"default" = 0,
+		"value"   = 0,
+		"options" = [
+			"Category",
+			"Rarity",
+			"None"
+		],
 		"category" = "General"
 	})
 
@@ -78,7 +75,7 @@ func _ready() -> void:
 	# ── Category Colors ───────────────────────────────────────────────────────
 	# Alpha controls tint opacity. Transparent (alpha=0) means no color is applied.
 	_config.set_value("Color", "catAmmo", {
-		"name"       = "Category-Ammo",
+		"name"       = "Ammo",
 		"tooltip"    = "Tint color for Ammo items. Set alpha to 0 to disable.",
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
@@ -87,7 +84,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catArmor", {
-		"name"       = "Category-Armor",
+		"name"       = "Armor",
 		"tooltip"    = "Tint color for Armor items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -96,7 +93,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catAttachments", {
-		"name"       = "Category-Attachments",
+		"name"       = "Attachments",
 		"tooltip"    = "Tint color for Attachment items. Set alpha to 0 to disable.",
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
@@ -105,7 +102,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catBackpacks", {
-		"name"       = "Category-Backpacks",
+		"name"       = "Backpacks",
 		"tooltip"    = "Tint color for Backpack items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -114,7 +111,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catBelts", {
-		"name"       = "Category-Belts",
+		"name"       = "Belts",
 		"tooltip"    = "Tint color for Belt items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -123,7 +120,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catBooks", {
-		"name"       = "Category-Books",
+		"name"       = "Books",
 		"tooltip"    = "Tint color for Book items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -132,7 +129,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catClothing", {
-		"name"       = "Category-Clothing",
+		"name"       = "Clothing",
 		"tooltip"    = "Tint color for Clothing items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -141,7 +138,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catConsumables", {
-		"name"       = "Category-Consumables",
+		"name"       = "Consumables",
 		"tooltip"    = "Tint color for Consumable items. Set alpha to 0 to disable.",
 		"default"    = Color(0.90, 0.60, 0.05, 0.15),
 		"value"      = Color(0.90, 0.60, 0.05, 0.15),
@@ -150,7 +147,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catElectronics", {
-		"name"       = "Category-Electronics",
+		"name"       = "Electronics",
 		"tooltip"    = "Tint color for Electronics items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -159,7 +156,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catFishing", {
-		"name"       = "Category-Fishing",
+		"name"       = "Fishing",
 		"tooltip"    = "Tint color for Fishing items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -168,7 +165,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catGrenades", {
-		"name"       = "Category-Grenades",
+		"name"       = "Grenades",
 		"tooltip"    = "Tint color for Grenade items. Set alpha to 0 to disable.",
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
@@ -177,7 +174,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catHelmets", {
-		"name"       = "Category-Helmets",
+		"name"       = "Helmets",
 		"tooltip"    = "Tint color for Helmet items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -186,7 +183,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catInstruments", {
-		"name"       = "Category-Instruments",
+		"name"       = "Instruments",
 		"tooltip"    = "Tint color for Instrument items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -195,7 +192,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catKeys", {
-		"name"       = "Category-Keys",
+		"name"       = "Keys",
 		"tooltip"    = "Tint color for Key items. Set alpha to 0 to disable.",
 		"default"    = Color(0.95, 0.40, 0.70, 0.15),
 		"value"      = Color(0.95, 0.40, 0.70, 0.15),
@@ -204,7 +201,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catKnives", {
-		"name"       = "Category-Knives",
+		"name"       = "Knives",
 		"tooltip"    = "Tint color for Knife items. Set alpha to 0 to disable.",
 		"default"    = Color(0.25, 0.25, 0.25, 0.15),
 		"value"      = Color(0.25, 0.25, 0.25, 0.15),
@@ -213,7 +210,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catLore", {
-		"name"       = "Category-Lore",
+		"name"       = "Lore",
 		"tooltip"    = "Tint color for Lore items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -222,7 +219,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catMedical", {
-		"name"       = "Category-Medical",
+		"name"       = "Medical",
 		"tooltip"    = "Tint color for Medical items. Set alpha to 0 to disable.",
 		"default"    = Color(0.85, 0.10, 0.10, 0.15),
 		"value"      = Color(0.85, 0.10, 0.10, 0.15),
@@ -231,7 +228,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catMisc", {
-		"name"       = "Category-Misc",
+		"name"       = "Misc",
 		"tooltip"    = "Tint color for Misc items. Set alpha to 0 to disable.",
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
@@ -240,7 +237,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catRigs", {
-		"name"       = "Category-Rigs",
+		"name"       = "Rigs",
 		"tooltip"    = "Tint color for Rig items. Set alpha to 0 to disable.",
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
@@ -249,7 +246,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "catWeapons", {
-		"name"       = "Category-Weapons",
+		"name"       = "Weapons",
 		"tooltip"    = "Tint color for Weapon items. Set alpha to 0 to disable.",
 		"default"    = Color(0.25, 0.25, 0.25, 0.15),
 		"value"      = Color(0.25, 0.25, 0.25, 0.15),
@@ -259,7 +256,7 @@ func _ready() -> void:
 
 	# ── Rarity Colors ─────────────────────────────────────────────────────────
 	_config.set_value("Color", "rarCommon", {
-		"name"       = "Rarity-Common",
+		"name"       = "Common",
 		"tooltip"    = "Tint color for Common rarity items. Set alpha to 0 to disable.",
 		"default"    = Color(0.40, 0.40, 0.40, 0.15),
 		"value"      = Color(0.40, 0.40, 0.40, 0.15),
@@ -268,7 +265,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "rarRare", {
-		"name"       = "Rarity-Rare",
+		"name"       = "Rare",
 		"tooltip"    = "Tint color for Rare rarity items. Set alpha to 0 to disable.",
 		"default"    = Color(0.60, 0.20, 0.80, 0.15),
 		"value"      = Color(0.60, 0.20, 0.80, 0.15),
@@ -277,7 +274,7 @@ func _ready() -> void:
 	})
 
 	_config.set_value("Color", "rarLegendary", {
-		"name"       = "Rarity-Legendary",
+		"name"       = "Legendary",
 		"tooltip"    = "Tint color for Legendary rarity items. Set alpha to 0 to disable.",
 		"default"    = Color(1.00, 0.65, 0.00, 0.15),
 		"value"      = Color(1.00, 0.65, 0.00, 0.15),

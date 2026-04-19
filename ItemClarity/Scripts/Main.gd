@@ -132,8 +132,7 @@ func _remove_all_overlays(node: Node) -> void:
 
 func _read_config() -> Dictionary:
 	var result = {
-		"category_enabled": true,
-		"rarity_enabled":   false,
+		"color_coding_mode": 0,  # 0=Category, 1=Rarity, 2=None
 		"task_marking":       true,
 		"noted_tasks_only":   false,
 		"recipe_tooltip":     true,
@@ -170,8 +169,7 @@ func _read_config() -> Dictionary:
 	if cfg.load(CONFIG_PATH) != OK:
 		print("[IC] config file not found, using defaults")
 		return result
-	result["category_enabled"] = _get_bool(cfg, "Bool", "categoryColorCoding", true)
-	result["rarity_enabled"]   = _get_bool(cfg, "Bool", "rarityColorCoding",   false)
+	result["color_coding_mode"] = _get_int(cfg, "Dropdown", "colorCodingMode", 0)
 	result["task_marking"]       = _get_bool(cfg, "Bool", "taskMarking",         true)
 	result["noted_tasks_only"]   = _get_bool(cfg, "Bool", "notedTasksOnly",      false)
 	result["recipe_tooltip"]     = _get_bool(cfg, "Bool", "recipeTooltip",       true)
@@ -244,17 +242,22 @@ func apply_color_to_item(item: Node) -> void:
 		return
 
 	var color: Color = Color(0, 0, 0, 0)
+	var mode: int = _conf.get("color_coding_mode", 0)
 
-	# Category coding takes priority
-	if _conf.get("category_enabled", true):
+	if mode == 0:
+		# Category coding
 		var cat = _get_category(item)
 		if cat != "":
 			color = _conf["cat_colors"].get(cat, Color(0, 0, 0, 0))
-
-	# Fall back to rarity coding if no category matched (or category has no color)
-	if color.a == 0 and _conf.get("rarity_enabled", false):
+		# Fall back to rarity if category has no color assigned
+		if color.a == 0:
+			var rarity: int = item.slotData.itemData.rarity
+			color = _conf["rar_colors"].get(rarity, Color(0, 0, 0, 0))
+	elif mode == 1:
+		# Rarity coding only
 		var rarity: int = item.slotData.itemData.rarity
 		color = _conf["rar_colors"].get(rarity, Color(0, 0, 0, 0))
+	# mode == 2 (None): color stays transparent
 
 	if color.a == 0:
 		return
