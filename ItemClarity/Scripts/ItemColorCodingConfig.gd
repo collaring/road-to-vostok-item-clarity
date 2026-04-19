@@ -34,6 +34,14 @@ func _ready() -> void:
 		"category" = "General"
 	})
 
+	_config.set_value("Bool", "notedTasksOnly", {
+		"name"     = "Only Show Task Marker on Noted Tasks",
+		"tooltip"  = "When enabled, the '!' badge only appears on items needed for tasks you have manually added to your notes.",
+		"default"  = false,
+		"value"    = false,
+		"category" = "General"
+	})
+
 	_config.set_value("Dropdown", "taskMarkerCorner", {
 		"name"    = "Task Marker Corner",
 		"tooltip" = "Which corner to place the '!' task marker on items needed for active tasks.",

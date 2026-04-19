@@ -39,7 +39,7 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 	# Slow timer: refreshes task completion state (e.g. after finishing a task)
 	var timer = Timer.new()
-	timer.wait_time = 10.0
+	timer.wait_time = 3.0
 	timer.autostart = true
 	timer.timeout.connect(_on_rescan_timer)
 	add_child(timer)
@@ -65,8 +65,10 @@ func _on_node_added(node: Node) -> void:
 
 
 func _on_rescan_timer() -> void:
-	# Only reload task data — scene tree is already handled by node_added signal
+	var old_paths = _task_needed_paths.duplicate()
 	_load_task_data()
+	if _task_needed_paths != old_paths:
+		_scan_existing_items()
 	if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label) \
 			or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label):
 		_tooltip_quest_label = null
@@ -124,6 +126,7 @@ func _read_config() -> Dictionary:
 		"category_enabled": true,
 		"rarity_enabled":   false,
 		"task_marking":       true,
+		"noted_tasks_only":   false,
 		"recipe_tooltip":     true,
 		"task_marker_corner": 0,
 		"cat_colors": {
@@ -161,6 +164,7 @@ func _read_config() -> Dictionary:
 	result["category_enabled"] = _get_bool(cfg, "Bool", "categoryColorCoding", true)
 	result["rarity_enabled"]   = _get_bool(cfg, "Bool", "rarityColorCoding",   false)
 	result["task_marking"]       = _get_bool(cfg, "Bool", "taskMarking",         true)
+	result["noted_tasks_only"]   = _get_bool(cfg, "Bool", "notedTasksOnly",      false)
 	result["recipe_tooltip"]     = _get_bool(cfg, "Bool", "recipeTooltip",       true)
 	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    0)
 	result["cat_colors"] = {
@@ -351,6 +355,14 @@ func _load_task_data() -> void:
 	# Load save data to know which tasks are completed per trader
 	var trader_save = load("user://Traders.tres") if FileAccess.file_exists("user://Traders.tres") else null
 
+	# Build set of noted task resource paths if the filter is enabled
+	var noted_paths: Dictionary = {}
+	var noted_only: bool = _conf.get("noted_tasks_only", false)
+	if noted_only and trader_save and trader_save.get("taskNotes") != null:
+		for noted_task in trader_save.get("taskNotes"):
+			if noted_task != null and noted_task.resource_path != "":
+				noted_paths[noted_task.resource_path] = true
+
 	var completed_by_trader: Dictionary = {}
 	if trader_save:
 		completed_by_trader = {
@@ -378,6 +390,8 @@ func _load_task_data() -> void:
 			if task == null or not ("name" in task) or not ("deliver" in task):
 				continue
 			if task.name in completed:
+				continue
+			if noted_only and task.resource_path not in noted_paths:
 				continue
 			# Count how many of each item this task needs
 			var counts: Dictionary = {}
