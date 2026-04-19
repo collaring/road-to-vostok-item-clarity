@@ -361,7 +361,8 @@ func apply_recipe_hover(item: Node) -> void:
 		hover_zone.mouse_filter = Control.MOUSE_FILTER_PASS
 		hover_zone.set_anchors_preset(Control.PRESET_FULL_RECT)
 		item.add_child(hover_zone)
-		hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(key))
+		# Pass both the item node and the key so both price and task tooltips work
+		hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(item, key))
 		hover_zone.mouse_exited.connect(_on_task_item_mouse_exited)
 
 
@@ -511,28 +512,40 @@ func apply_task_icon(item: Node) -> void:
 			icon_label.offset_bottom = -2
 	item.add_child(icon_label)
 
-	# Invisible full-rect hover zone  Ecovers the whole item slot so hovering
+	# Invisible full-rect hover zone covers the whole item slot so hovering
 	# anywhere on the item triggers the tooltip, not just the "!" icon
 	var hover_zone = Control.new()
 	hover_zone.name = "_icc_hover"
 	hover_zone.mouse_filter = Control.MOUSE_FILTER_PASS
 	hover_zone.set_anchors_preset(Control.PRESET_FULL_RECT)
 	item.add_child(hover_zone)
-	hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(key))
+	# Pass both the item node and the key so both price and task tooltips work
+	hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(item, key))
 	hover_zone.mouse_exited.connect(_on_task_item_mouse_exited)
 
 
-func _on_task_item_mouse_entered(item_key: String) -> void:
-	_hovered_item_key = item_key
+func _on_task_item_mouse_entered(item: Node, key: String) -> void:
+	# Use the item's slotData for durability/condition
+	if not "slotData" in item or item.slotData == null or item.slotData.itemData == null:
+		_hovered_item_key = ""
+		_hovered_price_text = ""
+		return
+	_hovered_item_key = key
+	var condition := 1.0
+	if "condition" in item.slotData and item.slotData.condition != null:
+		condition = float(item.slotData.condition)
+		if condition > 1.0:
+			condition /= 100.0
 	# Pre-compute price-per-slot so _process doesn't call load() every frame
 	_hovered_price_text = ""
-	if _conf.get("price_per_slot", true) and item_key != "":
-		var item_res = load(item_key)
+	if _conf.get("price_per_slot", true) and key != "":
+		var item_res = load(key)
 		if item_res != null:
-			var value: int = int(item_res.get("value"))
+			var base_value: float = float(item_res.get("value"))
+			var value: float = base_value * condition
 			var size: Vector2 = item_res.get("size")
 			var slots: int = max(1, int(size.x) * int(size.y))
-			var pps: int = value / slots
+			var pps: int = int(round(value / float(slots)))
 			_hovered_price_text = str(pps) + "€ / slot"
 
 func _on_task_item_mouse_exited() -> void:
