@@ -1,9 +1,9 @@
 # Package-Mod.ps1
-# Packages the ItemColorCoding folder into a .vmz file (zip archive).
+# Packages the ItemClarity folder into a .vmz file (zip archive).
 # Run from the repo root: .\Package-Mod.ps1
 
-$modFolder  = "ItemColorCoding"
-$outputName = "ItemColorCoding.vmz"
+$modFolder  = "ItemClarity"
+$outputName = "ItemClarity.vmz"
 
 if (-not (Test-Path $modFolder)) {
     Write-Error "Folder '$modFolder' not found. Run this script from the repo root."

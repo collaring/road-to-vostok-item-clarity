@@ -1,0 +1,13 @@
+[mod]
+id="ItemClarity"
+name="Item Clarity"
+author="ave"
+version="1.1.0"
+description="Color codes inventory items by category or rarity, and marks items needed for active trader tasks."
+
+[autoload]
+ItemClarityConfig="res://ItemClarity/Scripts/ItemColorCodingConfig.gd"
+ItemClarity="res://ItemClarity/Scripts/Main.gd"
+
+[updates]
+modworkshop=YOURMODID
