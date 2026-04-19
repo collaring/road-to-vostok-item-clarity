@@ -11,7 +11,9 @@ var _task_needed_paths: Dictionary = {}
 var _crafting_recipe_paths: Dictionary = {}
 var _tooltip_quest_label: Label = null
 var _tooltip_recipe_label: Label = null
+var _tooltip_price_label: Label = null
 var _hovered_item_key: String = ""
+var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
 # Cached config — loaded once on ready, refreshed by MCM on save
 var _conf: Dictionary = {}
@@ -73,9 +75,11 @@ func _on_rescan_timer() -> void:
 	if mtime == _traders_mtime:
 		# File unchanged — skip expensive reload entirely
 		if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label) \
-				or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label):
+				or _tooltip_recipe_label == null or not is_instance_valid(_tooltip_recipe_label) \
+				or _tooltip_price_label == null or not is_instance_valid(_tooltip_price_label):
 			_tooltip_quest_label = null
 			_tooltip_recipe_label = null
+			_tooltip_price_label = null
 			_find_and_setup_tooltip(get_tree().get_root())
 		return
 	_traders_mtime = mtime
@@ -136,6 +140,7 @@ func _read_config() -> Dictionary:
 		"task_marking":       true,
 		"noted_tasks_only":   false,
 		"recipe_tooltip":     true,
+		"price_per_slot":     true,
 		"task_marker_corner": 0,
 		"cat_colors": {
 			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
@@ -173,6 +178,7 @@ func _read_config() -> Dictionary:
 	result["task_marking"]       = _get_bool(cfg, "Bool", "taskMarking",         true)
 	result["noted_tasks_only"]   = _get_bool(cfg, "Bool", "notedTasksOnly",      false)
 	result["recipe_tooltip"]     = _get_bool(cfg, "Bool", "recipeTooltip",       true)
+	result["price_per_slot"]     = _get_bool(cfg, "Bool", "pricePerSlot",        true)
 	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    0)
 	result["cat_colors"] = {
 		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
@@ -292,7 +298,6 @@ func _walk_and_color(node: Node) -> void:
 func _is_item_node(node: Node) -> bool:
 	return ("slotData" in node) and (node is Panel)
 
-
 # ── Recipe tracking ──────────────────────────────────────────────────────────
 
 func _load_recipe_data() -> void:
@@ -335,14 +340,17 @@ func _load_recipe_data() -> void:
 
 
 func apply_recipe_hover(item: Node) -> void:
-	if not _conf.get("recipe_tooltip", true):
+	if not _conf.get("recipe_tooltip", true) and not _conf.get("price_per_slot", true):
 		return
 	if not "slotData" in item or item.slotData == null:
 		return
 	if item.slotData.itemData == null:
 		return
 	var key: String = item.slotData.itemData.resource_path
-	if not _crafting_recipe_paths.has(key):
+	# Only add hover zone if this item has something to show in the tooltip
+	var has_recipe = _conf.get("recipe_tooltip", true) and _crafting_recipe_paths.has(key)
+	var has_price = _conf.get("price_per_slot", true) and key != ""
+	if not has_recipe and not has_price:
 		return
 	# Reuse the existing hover zone if already added by apply_task_icon,
 	# otherwise we need our own hover connection
@@ -516,20 +524,31 @@ func apply_task_icon(item: Node) -> void:
 
 func _on_task_item_mouse_entered(item_key: String) -> void:
 	_hovered_item_key = item_key
-
+	# Pre-compute price-per-slot so _process doesn't call load() every frame
+	_hovered_price_text = ""
+	if _conf.get("price_per_slot", true) and item_key != "":
+		var item_res = load(item_key)
+		if item_res != null:
+			var value: int = int(item_res.get("value"))
+			var size: Vector2 = item_res.get("size")
+			var slots: int = max(1, int(size.x) * int(size.y))
+			var pps: int = value / slots
+			_hovered_price_text = str(pps) + "€ / slot"
 
 func _on_task_item_mouse_exited() -> void:
 	_hovered_item_key = ""
+	_hovered_price_text = ""
 
 
 func _process(_delta: float) -> void:
-	if _tooltip_quest_label == null and _tooltip_recipe_label == null:
+	if _tooltip_quest_label == null and _tooltip_recipe_label == null and _tooltip_price_label == null:
 		return
 	# Walk up: Label -> Elements (VBox) -> Margin -> Panel -> Tooltip (Control)
-	var ref_label = _tooltip_quest_label if _tooltip_quest_label != null else _tooltip_recipe_label
+	var ref_label = _tooltip_quest_label if _tooltip_quest_label != null else (_tooltip_recipe_label if _tooltip_recipe_label != null else _tooltip_price_label)
 	if not is_instance_valid(ref_label):
 		_tooltip_quest_label = null
 		_tooltip_recipe_label = null
+		_tooltip_price_label = null
 		return
 	var tooltip_root = ref_label.get_parent().get_parent().get_parent().get_parent()
 	var tooltip_visible = is_instance_valid(tooltip_root) and tooltip_root.visible
@@ -553,10 +572,16 @@ func _process(_delta: float) -> void:
 			else:
 				_tooltip_recipe_label.text = "Used in crafting:\n" + "\n".join(recipe_info)
 				_tooltip_recipe_label.visible = true
+	if _tooltip_price_label != null and is_instance_valid(_tooltip_price_label):
+		if not tooltip_visible or not _conf.get("price_per_slot", true) or _hovered_price_text == "":
+			_tooltip_price_label.visible = false
+		else:
+			_tooltip_price_label.text = _hovered_price_text
+			_tooltip_price_label.visible = true
 
 
 func _setup_tooltip_label(tooltip: Node) -> void:
-	if _tooltip_quest_label != null and _tooltip_recipe_label != null:
+	if _tooltip_quest_label != null and _tooltip_recipe_label != null and _tooltip_price_label != null:
 		return
 
 	var vbox = tooltip.get_node_or_null("Panel/Margin/Elements")
@@ -565,6 +590,21 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 
 	var info_node = vbox.get_node_or_null("Info")
 	var insert_after_idx = info_node.get_index() if info_node else vbox.get_child_count() - 1
+
+	# Insert price label first, so it appears at the top
+	if _tooltip_price_label == null:
+		var price_label = Label.new()
+		price_label.name = "_icc_price_label"
+		price_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		price_label.custom_minimum_size = Vector2(256.0, 0.0)
+		price_label.add_theme_font_size_override("font_size", 12)
+		price_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Light green
+		price_label.visible = false
+		vbox.add_child(price_label)
+		# Move to just after Info (or top if no Info)
+		vbox.move_child(price_label, insert_after_idx + 1)
+		_tooltip_price_label = price_label
+		insert_after_idx += 1
 
 	if _tooltip_quest_label == null:
 		var quest_label = Label.new()
@@ -575,8 +615,7 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 		quest_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.0))  # Gold
 		quest_label.visible = false
 		vbox.add_child(quest_label)
-		if info_node:
-			vbox.move_child(quest_label, insert_after_idx + 1)
+		vbox.move_child(quest_label, insert_after_idx + 1)
 		_tooltip_quest_label = quest_label
 		insert_after_idx += 1
 
@@ -591,6 +630,7 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 		vbox.add_child(recipe_label)
 		vbox.move_child(recipe_label, insert_after_idx + 1)
 		_tooltip_recipe_label = recipe_label
+		insert_after_idx += 1
 
 
 func _dump_children(node: Node, depth: int) -> String:

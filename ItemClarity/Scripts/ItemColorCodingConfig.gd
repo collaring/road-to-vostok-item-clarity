@@ -61,6 +61,14 @@ func _ready() -> void:
 		"category" = "General"
 	})
 
+	_config.set_value("Bool", "pricePerSlot", {
+		"name"     = "Price per Slot Tooltip",
+		"tooltip"  = "Shows the item's value divided by the number of inventory slots it occupies when hovering in the inventory.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
 	_config.set_value("Float", "tooltipDelay", {
 		"name"     = "Tooltip Delay (seconds)",
 		"tooltip"  = "How long to hover an item before its tooltip appears. Default game value is 0.5.",
