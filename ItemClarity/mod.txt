@@ -10,4 +10,4 @@ ItemClarityConfig="res://ItemClarity/Scripts/ItemColorCodingConfig.gd"
 ItemClarity="res://ItemClarity/Scripts/Main.gd"
 
 [updates]
-modworkshop=YOURMODID
+modworkshop="YOURMODID"

@@ -6,39 +6,32 @@ var McmHelpers = load("res://ModConfigurationMenu/Scripts/Doink Oink/MCM_Helpers
 const MOD_ID = "ItemClarity"
 const FILE_PATH = "user://MCM/ItemClarity"
 
-var border_opacity: float = 0.15
-
 func _ready() -> void:
 	var _config = ConfigFile.new()
 
+	# ── General ───────────────────────────────────────────────────────────────
 	_config.set_value("Bool", "categoryColorCoding", {
-		"name"    = "Color Coding - Category",
-		"tooltip" = "Color items by category (Medical, Ammo, Weapons, etc.). Takes priority over rarity coding.",
-		"default" = true,
-		"value"   = true
+		"name"     = "Color Coding - Category",
+		"tooltip"  = "Color items by category (Medical, Ammo, Weapons, etc.). Takes priority over rarity coding.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
 	})
 
 	_config.set_value("Bool", "rarityColorCoding", {
-		"name"    = "Color Coding - Rarity",
-		"tooltip" = "Color items by rarity (Common, Rare, Legendary). Used when category coding is off or the item has no known category.",
-		"default" = false,
-		"value"   = false
-	})
-
-	_config.set_value("Float", "borderOpacity", {
-		"name"     = "Color Opacity",
-		"tooltip"  = "Opacity of the rarity color (0 = invisible, 1 = fully opaque).",
-		"default"  = 0.15,
-		"value"    = 0.15,
-		"minRange" = 0.0,
-		"maxRange" = 1.0
+		"name"     = "Color Coding - Rarity",
+		"tooltip"  = "Color items by rarity (Common, Rare, Legendary). Used when category coding is off or the item has no known category color.",
+		"default"  = false,
+		"value"    = false,
+		"category" = "General"
 	})
 
 	_config.set_value("Bool", "taskMarking", {
-		"name"    = "Mark Items Needed for Tasks",
-		"tooltip" = "Shows a '!' badge on items required for active trader tasks, and lists them in the item tooltip.",
-		"default" = true,
-		"value"   = true
+		"name"     = "Mark Items Needed for Tasks",
+		"tooltip"  = "Shows a '!' badge on items required for active trader tasks, and lists them in the item tooltip.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
 	})
 
 	_config.set_value("Float", "tooltipDelay", {
@@ -47,8 +40,225 @@ func _ready() -> void:
 		"default"  = 0.1,
 		"value"    = 0.1,
 		"minRange" = 0.0,
-		"maxRange" = 2.0
+		"maxRange" = 2.0,
+		"step"     = 0.05,
+		"category" = "General"
 	})
+
+	# ── Category Colors ───────────────────────────────────────────────────────
+	# Alpha controls tint opacity. Transparent (alpha=0) means no color is applied.
+	_config.set_value("Color", "catAmmo", {
+		"name"       = "Category-Ammo",
+		"tooltip"    = "Tint color for Ammo items. Set alpha to 0 to disable.",
+		"default"    = Color(0.15, 0.65, 0.15, 0.15),
+		"value"      = Color(0.15, 0.65, 0.15, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catArmor", {
+		"name"       = "Category-Armor",
+		"tooltip"    = "Tint color for Armor items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catAttachments", {
+		"name"       = "Category-Attachments",
+		"tooltip"    = "Tint color for Attachment items. Set alpha to 0 to disable.",
+		"default"    = Color(0.15, 0.65, 0.15, 0.15),
+		"value"      = Color(0.15, 0.65, 0.15, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catBackpacks", {
+		"name"       = "Category-Backpacks",
+		"tooltip"    = "Tint color for Backpack items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catBelts", {
+		"name"       = "Category-Belts",
+		"tooltip"    = "Tint color for Belt items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catBooks", {
+		"name"       = "Category-Books",
+		"tooltip"    = "Tint color for Book items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catClothing", {
+		"name"       = "Category-Clothing",
+		"tooltip"    = "Tint color for Clothing items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catConsumables", {
+		"name"       = "Category-Consumables",
+		"tooltip"    = "Tint color for Consumable items. Set alpha to 0 to disable.",
+		"default"    = Color(0.90, 0.60, 0.05, 0.15),
+		"value"      = Color(0.90, 0.60, 0.05, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catElectronics", {
+		"name"       = "Category-Electronics",
+		"tooltip"    = "Tint color for Electronics items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catFishing", {
+		"name"       = "Category-Fishing",
+		"tooltip"    = "Tint color for Fishing items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catGrenades", {
+		"name"       = "Category-Grenades",
+		"tooltip"    = "Tint color for Grenade items. Set alpha to 0 to disable.",
+		"default"    = Color(0.15, 0.65, 0.15, 0.15),
+		"value"      = Color(0.15, 0.65, 0.15, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catHelmets", {
+		"name"       = "Category-Helmets",
+		"tooltip"    = "Tint color for Helmet items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catInstruments", {
+		"name"       = "Category-Instruments",
+		"tooltip"    = "Tint color for Instrument items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catKeys", {
+		"name"       = "Category-Keys",
+		"tooltip"    = "Tint color for Key items. Set alpha to 0 to disable.",
+		"default"    = Color(0.85, 0.70, 0.00, 0.15),
+		"value"      = Color(0.85, 0.70, 0.00, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catKnives", {
+		"name"       = "Category-Knives",
+		"tooltip"    = "Tint color for Knife items. Set alpha to 0 to disable.",
+		"default"    = Color(0.25, 0.25, 0.25, 0.15),
+		"value"      = Color(0.25, 0.25, 0.25, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catLore", {
+		"name"       = "Category-Lore",
+		"tooltip"    = "Tint color for Lore items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catMedical", {
+		"name"       = "Category-Medical",
+		"tooltip"    = "Tint color for Medical items. Set alpha to 0 to disable.",
+		"default"    = Color(0.85, 0.10, 0.10, 0.15),
+		"value"      = Color(0.85, 0.10, 0.10, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catMisc", {
+		"name"       = "Category-Misc",
+		"tooltip"    = "Tint color for Misc items. Set alpha to 0 to disable.",
+		"default"    = Color(0.0, 0.0, 0.0, 0.0),
+		"value"      = Color(0.0, 0.0, 0.0, 0.0),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catRigs", {
+		"name"       = "Category-Rigs",
+		"tooltip"    = "Tint color for Rig items. Set alpha to 0 to disable.",
+		"default"    = Color(0.55, 0.15, 0.75, 0.15),
+		"value"      = Color(0.55, 0.15, 0.75, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	_config.set_value("Color", "catWeapons", {
+		"name"       = "Category-Weapons",
+		"tooltip"    = "Tint color for Weapon items. Set alpha to 0 to disable.",
+		"default"    = Color(0.25, 0.25, 0.25, 0.15),
+		"value"      = Color(0.25, 0.25, 0.25, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Category Colors"
+	})
+
+	# ── Rarity Colors ─────────────────────────────────────────────────────────
+	_config.set_value("Color", "rarCommon", {
+		"name"       = "Rarity-Common",
+		"tooltip"    = "Tint color for Common rarity items. Set alpha to 0 to disable.",
+		"default"    = Color(0.40, 0.40, 0.40, 0.15),
+		"value"      = Color(0.40, 0.40, 0.40, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Rarity Colors"
+	})
+
+	_config.set_value("Color", "rarRare", {
+		"name"       = "Rarity-Rare",
+		"tooltip"    = "Tint color for Rare rarity items. Set alpha to 0 to disable.",
+		"default"    = Color(0.60, 0.20, 0.80, 0.15),
+		"value"      = Color(0.60, 0.20, 0.80, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Rarity Colors"
+	})
+
+	_config.set_value("Color", "rarLegendary", {
+		"name"       = "Rarity-Legendary",
+		"tooltip"    = "Tint color for Legendary rarity items. Set alpha to 0 to disable.",
+		"default"    = Color(1.00, 0.65, 0.00, 0.15),
+		"value"      = Color(1.00, 0.65, 0.00, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Rarity Colors"
+	})
+
+	# ── Category ordering ────────────────────────────────────────────────────
+	_config.set_value("Category", "General",         { "menu_pos" = 1 })
+	_config.set_value("Category", "Category Colors", { "menu_pos" = 2 })
+	_config.set_value("Category", "Rarity Colors",   { "menu_pos" = 3 })
 
 	if !FileAccess.file_exists(FILE_PATH + "/config.ini"):
 		DirAccess.make_dir_recursive_absolute(FILE_PATH)
@@ -58,8 +268,7 @@ func _ready() -> void:
 			McmHelpers.CheckConfigurationHasUpdated(MOD_ID, _config, FILE_PATH + "/config.ini")
 		_config.load(FILE_PATH + "/config.ini")
 
-	# Apply the loaded values immediately
-	_apply_config(_config)
+	_apply_tooltip_delay(_config)
 
 	if McmHelpers:
 		McmHelpers.RegisterConfiguration(
@@ -92,11 +301,6 @@ func _find_node_named(node: Node, target: String) -> Node:
 		if found:
 			return found
 	return null
-
-
-func _apply_config(config: ConfigFile) -> void:
-	border_opacity = config.get_value("Float", "borderOpacity", 0.15)
-	_apply_tooltip_delay(config)
 
 
 func _apply_tooltip_delay(config: ConfigFile) -> void:

@@ -10,57 +10,32 @@ var _task_needed_paths: Dictionary = {}
 var _tooltip_quest_label: Label = null
 var _hovered_item_key: String = ""
 
-const DEFAULT_COMMON    = Color(0.40, 0.40, 0.40)
-const DEFAULT_RARE      = Color(0.60, 0.20, 0.80)
-const DEFAULT_LEGENDARY = Color(1.00, 0.65, 0.00)
-const DEFAULT_OPACITY   = 0.15
+# Cached config — loaded once on ready, refreshed by MCM on save
+var _conf: Dictionary = {}
 
-# Category colors
-const CAT_MEDICAL     = Color(0.85, 0.10, 0.10)  # Red
-const CAT_AMMO        = Color(0.15, 0.65, 0.15)  # Green
-const CAT_GRENADES    = Color(0.15, 0.65, 0.15)  # Green
-const CAT_ATTACHMENTS = Color(0.15, 0.65, 0.15)  # Green
-const CAT_BACKPACKS   = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_ARMOR       = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_BELTS       = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_CLOTHING    = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_HELMETS     = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_KEYS        = Color(0.85, 0.70, 0.00)  # Gold
-const CAT_WEAPONS     = Color(0.25, 0.25, 0.25)  # Dark gray
-const CAT_KNIVES      = Color(0.25, 0.25, 0.25)  # Dark gray
-const CAT_RIGS        = Color(0.55, 0.15, 0.75)  # Purple
-const CAT_CONSUMABLES = Color(0.90, 0.60, 0.05)  # Orange-yellow
+# All category and rarity colors are now read from MCM config.
+# Defaults (alpha baked in at 0.15) are used when no config file exists.
+const DEFAULT_OPACITY = 0.15
 
-const CATEGORY_COLORS = {
-	"Medical":     CAT_MEDICAL,
-	"Ammo":        CAT_AMMO,
-	"Grenades":    CAT_GRENADES,
-	"Attachments": CAT_ATTACHMENTS,
-	"Backpacks":   CAT_BACKPACKS,
-	"Armor":       CAT_ARMOR,
-	"Belts":       CAT_BELTS,
-	"Clothing":    CAT_CLOTHING,
-	"Helmets":     CAT_HELMETS,
-	"Keys":        CAT_KEYS,
-	"Weapons":     CAT_WEAPONS,
-	"Knives":      CAT_KNIVES,
-	"Rigs":        CAT_RIGS,
-	"Consumables": CAT_CONSUMABLES,
-}
+const ALL_CATEGORIES = [
+	"Ammo", "Armor", "Attachments", "Backpacks", "Belts",
+	"Books", "Clothing", "Consumables", "Electronics", "Fishing",
+	"Grenades", "Helmets", "Instruments", "Keys", "Knives",
+	"Lore", "Medical", "Misc", "Rigs", "Weapons",
+]
 
 
 func _ready() -> void:
-	print("[IC] Main ready")
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_conf = _read_config()
 	_load_task_data()
-	var conf = _read_config()
-	print("[IC] config loaded, category=", conf["category_enabled"], " rarity=", conf["rarity_enabled"])
 	_scan_existing_items()
 	_find_and_setup_tooltip(get_tree().get_root())
 	get_tree().node_added.connect(_on_node_added)
+	# Slow timer: refreshes task completion state (e.g. after finishing a task)
 	var timer = Timer.new()
-	timer.wait_time = 2.0
+	timer.wait_time = 10.0
 	timer.autostart = true
 	timer.timeout.connect(_on_rescan_timer)
 	add_child(timer)
@@ -83,17 +58,11 @@ func _on_node_added(node: Node) -> void:
 
 
 func _on_rescan_timer() -> void:
+	# Only reload task data — scene tree is already handled by node_added signal
 	_load_task_data()
-	_scan_existing_items()
 	if _tooltip_quest_label == null or not is_instance_valid(_tooltip_quest_label):
 		_tooltip_quest_label = null
 		_find_and_setup_tooltip(get_tree().get_root())
-	# Re-apply tooltip delay in case Interface just loaded
-	var cfg_node = _find_config_node()
-	if cfg_node and cfg_node.has_method("_apply_tooltip_delay"):
-		var cfg = ConfigFile.new()
-		if cfg.load(CONFIG_PATH) == OK:
-			cfg_node._apply_tooltip_delay(cfg)
 
 
 func _find_and_setup_tooltip(node: Node) -> void:
@@ -108,7 +77,7 @@ func _find_and_setup_tooltip(node: Node) -> void:
 
 
 func refresh_all_slots() -> void:
-	print("[IC] refresh_all_slots")
+	_conf = _read_config()
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_scan_existing_items()
@@ -131,17 +100,70 @@ func _remove_all_overlays(node: Node) -> void:
 func _read_config() -> Dictionary:
 	var result = {
 		"category_enabled": true,
-		"rarity_enabled": false,
-		"opacity": DEFAULT_OPACITY
+		"rarity_enabled":   false,
+		"task_marking":     true,
+		"cat_colors": {
+			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
+			"Armor":       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Attachments": Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
+			"Backpacks":   Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Belts":       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Books":       Color(0.0,  0.0,  0.0,  0.0),
+			"Clothing":    Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Consumables": Color(0.90, 0.60, 0.05, DEFAULT_OPACITY),
+			"Electronics": Color(0.0,  0.0,  0.0,  0.0),
+			"Fishing":     Color(0.0,  0.0,  0.0,  0.0),
+			"Grenades":    Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
+			"Helmets":     Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Instruments": Color(0.0,  0.0,  0.0,  0.0),
+			"Keys":        Color(0.85, 0.70, 0.00, DEFAULT_OPACITY),
+			"Knives":      Color(0.25, 0.25, 0.25, DEFAULT_OPACITY),
+			"Lore":        Color(0.0,  0.0,  0.0,  0.0),
+			"Medical":     Color(0.85, 0.10, 0.10, DEFAULT_OPACITY),
+			"Misc":        Color(0.0,  0.0,  0.0,  0.0),
+			"Rigs":        Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
+			"Weapons":     Color(0.25, 0.25, 0.25, DEFAULT_OPACITY),
+		},
+		"rar_colors": {
+			0: Color(0.40, 0.40, 0.40, DEFAULT_OPACITY),
+			1: Color(0.60, 0.20, 0.80, DEFAULT_OPACITY),
+			2: Color(1.00, 0.65, 0.00, DEFAULT_OPACITY),
+		},
 	}
 	var cfg = ConfigFile.new()
 	if cfg.load(CONFIG_PATH) != OK:
 		print("[IC] config file not found, using defaults")
 		return result
-	result["category_enabled"] = _get_bool(cfg,  "Bool",  "categoryColorCoding", true)
-	result["rarity_enabled"]   = _get_bool(cfg,  "Bool",  "rarityColorCoding",   false)
-	result["opacity"]          = _get_float(cfg, "Float", "borderOpacity",       DEFAULT_OPACITY)
-	result["task_marking"]     = _get_bool(cfg,  "Bool",  "taskMarking",         true)
+	result["category_enabled"] = _get_bool(cfg, "Bool", "categoryColorCoding", true)
+	result["rarity_enabled"]   = _get_bool(cfg, "Bool", "rarityColorCoding",   false)
+	result["task_marking"]     = _get_bool(cfg, "Bool", "taskMarking",         true)
+	result["cat_colors"] = {
+		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
+		"Armor":       _get_color(cfg, "Color", "catArmor",       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Attachments": _get_color(cfg, "Color", "catAttachments", Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
+		"Backpacks":   _get_color(cfg, "Color", "catBackpacks",   Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Belts":       _get_color(cfg, "Color", "catBelts",       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Books":       _get_color(cfg, "Color", "catBooks",       Color(0.0,  0.0,  0.0,  0.0)),
+		"Clothing":    _get_color(cfg, "Color", "catClothing",    Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Consumables": _get_color(cfg, "Color", "catConsumables", Color(0.90, 0.60, 0.05, DEFAULT_OPACITY)),
+		"Electronics": _get_color(cfg, "Color", "catElectronics", Color(0.0,  0.0,  0.0,  0.0)),
+		"Fishing":     _get_color(cfg, "Color", "catFishing",     Color(0.0,  0.0,  0.0,  0.0)),
+		"Grenades":    _get_color(cfg, "Color", "catGrenades",    Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
+		"Helmets":     _get_color(cfg, "Color", "catHelmets",     Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Instruments": _get_color(cfg, "Color", "catInstruments", Color(0.0,  0.0,  0.0,  0.0)),
+		"Keys":        _get_color(cfg, "Color", "catKeys",        Color(0.85, 0.70, 0.00, DEFAULT_OPACITY)),
+		"Knives":      _get_color(cfg, "Color", "catKnives",      Color(0.25, 0.25, 0.25, DEFAULT_OPACITY)),
+		"Lore":        _get_color(cfg, "Color", "catLore",        Color(0.0,  0.0,  0.0,  0.0)),
+		"Medical":     _get_color(cfg, "Color", "catMedical",     Color(0.85, 0.10, 0.10, DEFAULT_OPACITY)),
+		"Misc":        _get_color(cfg, "Color", "catMisc",        Color(0.0,  0.0,  0.0,  0.0)),
+		"Rigs":        _get_color(cfg, "Color", "catRigs",        Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
+		"Weapons":     _get_color(cfg, "Color", "catWeapons",     Color(0.25, 0.25, 0.25, DEFAULT_OPACITY)),
+	}
+	result["rar_colors"] = {
+		0: _get_color(cfg, "Color", "rarCommon",    Color(0.40, 0.40, 0.40, DEFAULT_OPACITY)),
+		1: _get_color(cfg, "Color", "rarRare",      Color(0.60, 0.20, 0.80, DEFAULT_OPACITY)),
+		2: _get_color(cfg, "Color", "rarLegendary", Color(1.00, 0.65, 0.00, DEFAULT_OPACITY)),
+	}
 	return result
 
 
@@ -158,16 +180,10 @@ func _get_color(cfg: ConfigFile, section: String, key: String, default: Color) -
 	return default
 
 
-func _get_float(cfg: ConfigFile, section: String, key: String, default: float) -> float:
-	var v = cfg.get_value(section, key, default)
-	if v is Dictionary: return float(v.get("value", default))
-	return float(v)
-
-
 func _get_category(item: Node) -> String:
 	var path: String = item.slotData.itemData.resource_path
 	# path looks like res://Items/Medical/bandage.tres
-	for category in CATEGORY_COLORS:
+	for category in ALL_CATEGORIES:
 		if path.contains("/" + category + "/"):
 			return category
 	return ""
@@ -182,28 +198,22 @@ func apply_color_to_item(item: Node) -> void:
 	if item.get_node_or_null(OVERLAY_NODE_NAME) != null:
 		return
 
-	var conf = _read_config()
 	var color: Color = Color(0, 0, 0, 0)
 
 	# Category coding takes priority
-	if conf["category_enabled"]:
+	if _conf.get("category_enabled", true):
 		var cat = _get_category(item)
 		if cat != "":
-			color = CATEGORY_COLORS[cat]
+			color = _conf["cat_colors"].get(cat, Color(0, 0, 0, 0))
 
-	# Fall back to rarity coding if no category matched
-	if color.a == 0 and conf["rarity_enabled"]:
+	# Fall back to rarity coding if no category matched (or category has no color)
+	if color.a == 0 and _conf.get("rarity_enabled", false):
 		var rarity: int = item.slotData.itemData.rarity
-		match rarity:
-			0: color = DEFAULT_COMMON
-			1: color = DEFAULT_RARE
-			2: color = DEFAULT_LEGENDARY
+		color = _conf["rar_colors"].get(rarity, Color(0, 0, 0, 0))
 
 	if color.a == 0:
 		return
-
-	color.a = conf["opacity"]
-	print("[IC] coloring item cat=", _get_category(item), " color=", color)
+	# Color alpha is configured per-color (set via MCM color picker)
 
 	var overlay = Panel.new()
 	overlay.name = OVERLAY_NODE_NAME
@@ -238,7 +248,7 @@ func _is_item_node(node: Node) -> bool:
 
 func _load_task_data() -> void:
 	_task_needed_paths = {}
-	if not _read_config()["task_marking"]:
+	if not _conf.get("task_marking", true):
 		return
 
 	# Load save data to know which tasks are completed per trader
@@ -252,28 +262,20 @@ func _load_task_data() -> void:
 			"Gunsmith":   _to_string_array(trader_save.get("gunsmith")   if trader_save.get("gunsmith")   != null else []),
 			"Grandma":    _to_string_array(trader_save.get("grandma")    if trader_save.get("grandma")    != null else []),
 		}
-		print("[IC] completed tasks: ", completed_by_trader)
-	else:
-		print("[IC] no Traders.tres save found")
 
 	var trader_dirs = DirAccess.get_directories_at("res://Traders/")
-	print("[IC] trader dirs: ", trader_dirs)
 	if trader_dirs.is_empty():
-		print("[IC] res://Traders/ returned no directories, skipping task tracking")
 		return
 
 	for trader_id in trader_dirs:
 		var trader_res_path = "res://Traders/" + trader_id + "/" + trader_id + ".tres"
 		var trader = load(trader_res_path)
 		if trader == null:
-			print("[IC] could not load trader: ", trader_res_path)
 			continue
 		if not ("tasks" in trader) or trader.tasks == null:
-			print("[IC] trader ", trader_id, " has no tasks property")
 			continue
 
 		var completed: Array = completed_by_trader.get(trader_id, [])
-		print("[IC] trader ", trader_id, " has ", trader.tasks.size(), " tasks, ", completed.size(), " completed")
 
 		for task in trader.tasks:
 			if task == null or not ("name" in task) or not ("deliver" in task):
@@ -296,8 +298,6 @@ func _load_task_data() -> void:
 				var line = "x" + str(count) + " for " + trader_id + ": " + task.name
 				_task_needed_paths[key].append(line)
 
-	print("[IC] task tracking loaded, ", _task_needed_paths.size(), " distinct needed items")
-
 
 func _to_string_array(arr) -> Array:
 	var result: Array = []
@@ -307,7 +307,7 @@ func _to_string_array(arr) -> Array:
 
 
 func apply_task_icon(item: Node) -> void:
-	if not _read_config()["task_marking"]:
+	if not _conf.get("task_marking", true):
 		return
 	if not "slotData" in item or item.slotData == null:
 		return
@@ -371,12 +371,10 @@ func apply_task_icon(item: Node) -> void:
 
 
 func _on_task_item_mouse_entered(item_key: String) -> void:
-	print("[IC] mouse_entered item key=", item_key)
 	_hovered_item_key = item_key
 
 
 func _on_task_item_mouse_exited() -> void:
-	print("[IC] mouse_exited")
 	_hovered_item_key = ""
 
 
@@ -391,9 +389,6 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(tooltip_root):
 		_tooltip_quest_label.visible = false
 		return
-	# Debug once when hovering
-	if _hovered_item_key != "":
-		print("[IC] _process: hovered=", _hovered_item_key, " tooltip_root.visible=", tooltip_root.visible, " modulate=", tooltip_root.modulate)
 	if not tooltip_root.visible:
 		_tooltip_quest_label.visible = false
 		return
@@ -428,7 +423,6 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 		vbox.move_child(label, info_node.get_index() + 1)
 
 	_tooltip_quest_label = label
-	print("[IC] Tooltip quest label set up")
 
 
 func _dump_children(node: Node, depth: int) -> String:
