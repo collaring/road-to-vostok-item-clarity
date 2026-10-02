@@ -177,8 +177,8 @@ func _input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
 		return
 	if not _edit.has_focus():
-		# F or Space jumps into the search box
-		if event.pressed and not event.echo and event.keycode in [KEY_F, KEY_SPACE] \
+		# Space jumps into the search box
+		if event.pressed and not event.echo and event.keycode == KEY_SPACE \
 				and not (event.ctrl_pressed or event.alt_pressed or event.shift_pressed or event.meta_pressed):
 			var focused = get_viewport().gui_get_focus_owner()
 			if focused is LineEdit or focused is TextEdit:
@@ -246,7 +246,7 @@ func _exit_tree() -> void:
 	_restore_key_bindings()
 
 
-# A press that already reached Input (F / Space opening the box) is undone by
+# A press that already reached Input (Space opening the box) is undone by
 # feeding Input the matching release while the bindings still exist
 func _cancel_press(event: InputEventKey) -> void:
 	var release: InputEventKey = event.duplicate()
