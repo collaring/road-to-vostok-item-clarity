@@ -5,7 +5,7 @@ const OVERLAY_NODE_NAME = "_icc_border"
 const TASK_ICON_NODE_NAME = "_icc_task"
 const CONFIG_PATH = "user://MCM/ItemClarity/config.ini"
 
-# task_needed_paths: resource_path -> Array[String] of formatted lines like "x2 for Gunsmith: Warm Meal"
+# task_needed_paths: resource_path -> Array of {"count": 2, "text": "Gunsmith: Warm Meal"}
 var _task_needed_paths: Dictionary = {}
 # crafting_recipe_paths: resource_path -> Array[String] of recipe names that use this item as ingredient
 var _crafting_recipe_paths: Dictionary = {}
@@ -13,6 +13,9 @@ var _tooltip_quest_label: Label = null
 var _tooltip_recipe_label: Label = null
 var _tooltip_price_label: Label = null
 var _tooltip_root: Control = null
+var _tooltip_rework: Node = null
+var _compat: Node = null
+var _counter: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -43,6 +46,14 @@ func _ready() -> void:
 	panel.config_node = _find_config_node()
 	panel.main_node = self
 	add_child(panel)
+	_tooltip_rework = load("res://ItemClarity/Scripts/TooltipRework.gd").new()
+	_tooltip_rework.set_enabled(_conf.get("tooltip_rework", true))
+	add_child(_tooltip_rework)
+	_compat = load("res://ItemClarity/Scripts/CompatHighlight.gd").new()
+	_apply_compat_config()
+	add_child(_compat)
+	_counter = load("res://ItemClarity/Scripts/ItemCounter.gd").new()
+	add_child(_counter)
 	_traders_os_path = ProjectSettings.globalize_path("user://Traders.tres")
 	_traders_mtime = FileAccess.get_modified_time(_traders_os_path)
 	_load_task_data()
@@ -64,7 +75,15 @@ func _on_node_added(node: Node) -> void:
 			node.ready.connect(_setup_tooltip_label.bind(node), CONNECT_ONE_SHOT)
 		elif node.name == "Interface" and "tooltipDelay" in node:
 			_apply_tooltip_delay(node)
+			if _tooltip_rework:
+				_tooltip_rework.interface = node
+			if _compat:
+				_compat.interface = node
+			if _counter:
+				_counter.interface = node
 		return
+	if _compat:
+		_compat.track(node)
 	if node.is_node_ready():
 		apply_color_to_item(node)
 		apply_task_icon(node)
@@ -113,6 +132,10 @@ func _find_and_setup_tooltip(node: Node) -> void:
 func refresh_all_slots() -> void:
 	_conf = _read_config()
 	_config_mtime = FileAccess.get_modified_time(CONFIG_PATH)
+	if _tooltip_rework:
+		_tooltip_rework.set_enabled(_conf.get("tooltip_rework", true))
+	if _compat:
+		_apply_compat_config()
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_load_recipe_data()
@@ -120,6 +143,11 @@ func refresh_all_slots() -> void:
 	var interface = get_node_or_null("/root/Map/Core/UI/Interface")
 	if interface and "tooltipDelay" in interface:
 		_apply_tooltip_delay(interface)
+
+
+func _apply_compat_config() -> void:
+	_compat.set_color(_conf.get("compat_color", Color("#ffffff46")))
+	_compat.set_enabled(_conf.get("compat_highlight", true))
 
 
 func _apply_tooltip_delay(interface: Node) -> void:
@@ -152,6 +180,10 @@ func _read_config() -> Dictionary:
 		"noted_tasks_only":   false,
 		"recipe_tooltip":     true,
 		"price_per_slot":     true,
+		"tooltip_rework":     true,
+		"compat_highlight":   true,
+		"task_have_count":    true,
+		"compat_color":       Color("#ffffff46"),
 		"task_marker_corner": 0,
 		"cat_colors": {
 			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
@@ -190,6 +222,10 @@ func _read_config() -> Dictionary:
 	result["noted_tasks_only"]   = _get_bool(cfg, "Bool", "notedTasksOnly",      false)
 	result["recipe_tooltip"]     = _get_bool(cfg, "Bool", "recipeTooltip",       true)
 	result["price_per_slot"]     = _get_bool(cfg, "Bool", "pricePerSlot",        true)
+	result["tooltip_rework"]     = _get_bool(cfg, "Bool", "tooltipRework",       true)
+	result["task_have_count"]    = _get_bool(cfg, "Bool", "taskHaveCount",       true)
+	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
+	result["compat_color"]       = _get_color(cfg, "Color", "compatHighlightColor", Color("#ffffff46"))
 	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    0)
 	result["cat_colors"] = {
 		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
@@ -299,6 +335,8 @@ func _scan_existing_items() -> void:
 
 func _walk_and_color(node: Node) -> void:
 	if _is_item_node(node):
+		if _compat:
+			_compat.track(node)
 		apply_color_to_item(node)
 		apply_task_icon(node)
 		apply_recipe_hover(node)
@@ -435,8 +473,7 @@ func _load_task_data() -> void:
 				if key not in _task_needed_paths:
 					_task_needed_paths[key] = []
 				var count: int = counts[key]
-				var line = "x" + str(count) + " for " + trader_id + ": " + task.name
-				_task_needed_paths[key].append(line)
+				_task_needed_paths[key].append({"count": count, "text": trader_id + ": " + task.name})
 
 
 func _to_string_array(arr) -> Array:
@@ -556,6 +593,19 @@ func _on_task_item_mouse_entered(item: Node, key: String) -> void:
 			var pps: int = int(round(value / float(slots)))
 			_hovered_price_text = str(pps) + "€ / slot"
 
+# "x2 for Gunsmith: Warm Meal (have 1/2)"
+func _format_task_lines(key: String, task_info: Array) -> Array:
+	var show_have: bool = _conf.get("task_have_count", true) and _counter != null
+	var have: int = _counter.get_count(key) if show_have else 0
+	var lines: Array = []
+	for task in task_info:
+		var line = "x" + str(task["count"]) + " for " + task["text"]
+		if show_have:
+			line += " (have " + str(have) + "/" + str(task["count"]) + ")"
+		lines.append(line)
+	return lines
+
+
 func _on_task_item_mouse_exited() -> void:
 	_hovered_item_key = ""
 	_hovered_price_text = ""
@@ -580,7 +630,7 @@ func _process(_delta: float) -> void:
 			if task_info.is_empty():
 				_tooltip_quest_label.visible = false
 			else:
-				_tooltip_quest_label.text = "Needed for tasks:\n" + "\n".join(task_info)
+				_tooltip_quest_label.text = "Needed for tasks:\n" + "\n".join(_format_task_lines(_hovered_item_key, task_info))
 				_tooltip_quest_label.visible = true
 	if _tooltip_recipe_label != null and is_instance_valid(_tooltip_recipe_label):
 		if not tooltip_visible:

@@ -102,6 +102,14 @@ func build_defaults() -> ConfigFile:
 		"category" = "General"
 	})
 
+	_add(_config, "Bool", "taskHaveCount", {
+		"name"     = "Show How Many You Have for Tasks",
+		"tooltip"  = "Adds '(have 1/2)' to task lines in the tooltip, counting your inventory, equipment and all your shelters' storage. Stackables only count when the stack is full enough for the trader to accept.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
 	_add(_config, "Dropdown", "taskMarkerCorner", {
 		"name"    = "Task Marker Corner",
 		"tooltip" = "Which corner to place the '!' task marker on items needed for active tasks.",
@@ -140,6 +148,31 @@ func build_defaults() -> ConfigFile:
 		"minRange" = 0.0,
 		"maxRange" = 2.0,
 		"step"     = 0.05,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "compatHighlight", {
+		"name"     = "Highlight Compatible Items",
+		"tooltip"  = "When hovering or dragging an item, outlines every compatible item: ammo, magazines, weapons and attachments.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Color", "compatHighlightColor", {
+		"name"       = "Compatible Highlight Color",
+		"tooltip"    = "Outline color for compatible items.",
+		"default"    = Color("#ffffff46"),
+		"value"      = Color("#ffffff46"),
+		"allowAlpha" = true,
+		"category"   = "General"
+	})
+
+	_add(_config, "Bool", "tooltipRework", {
+		"name"     = "Tooltip Rework",
+		"tooltip"  = "Smoother inventory tooltips: they stay open while you move the mouse, follow the cursor every frame, update instantly when you move to another item, and stay on screen.",
+		"default"  = true,
+		"value"    = true,
 		"category" = "General"
 	})
 
