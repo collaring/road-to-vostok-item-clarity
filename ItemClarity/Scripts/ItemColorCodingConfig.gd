@@ -113,8 +113,8 @@ func build_defaults() -> ConfigFile:
 	_add(_config, "Dropdown", "taskMarkerCorner", {
 		"name"    = "Task Marker Corner",
 		"tooltip" = "Which corner to place the '!' task marker on items needed for active tasks.",
-		"default" = 0,
-		"value"   = 0,
+		"default" = 3,
+		"value"   = 3,
 		"options" = [
 			"Bottom Right",
 			"Bottom Left",
@@ -148,6 +148,14 @@ func build_defaults() -> ConfigFile:
 		"minRange" = 0.0,
 		"maxRange" = 2.0,
 		"step"     = 0.05,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "searchBox", {
+		"name"     = "Inventory Search Box",
+		"tooltip"  = "Adds a search box while the inventory is open. Matching items are outlined and everything else is dimmed. Searches name, type, caliber and category, so '762' finds 7.62x39.",
+		"default"  = true,
+		"value"    = true,
 		"category" = "General"
 	})
 

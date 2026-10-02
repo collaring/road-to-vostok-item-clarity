@@ -16,6 +16,7 @@ var _tooltip_root: Control = null
 var _tooltip_rework: Node = null
 var _compat: Node = null
 var _counter: Node = null
+var _search: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -54,6 +55,10 @@ func _ready() -> void:
 	add_child(_compat)
 	_counter = load("res://ItemClarity/Scripts/ItemCounter.gd").new()
 	add_child(_counter)
+	# Search must be the root's last child so it gets keyboard input before the game
+	_search = load("res://ItemClarity/Scripts/SearchBox.gd").new()
+	_search.set_enabled(_conf.get("search_box", true))
+	get_tree().root.add_child.call_deferred(_search)
 	_traders_os_path = ProjectSettings.globalize_path("user://Traders.tres")
 	_traders_mtime = FileAccess.get_modified_time(_traders_os_path)
 	_load_task_data()
@@ -70,6 +75,8 @@ func _ready() -> void:
 
 
 func _on_node_added(node: Node) -> void:
+	if _search and node != _search and node.get_parent() == get_tree().root:
+		_keep_search_last.call_deferred()
 	if not _is_item_node(node):
 		if node.name == "Tooltip" and node is Control:
 			node.ready.connect(_setup_tooltip_label.bind(node), CONNECT_ONE_SHOT)
@@ -81,9 +88,13 @@ func _on_node_added(node: Node) -> void:
 				_compat.interface = node
 			if _counter:
 				_counter.interface = node
+			if _search:
+				_search.interface = node
 		return
 	if _compat:
 		_compat.track(node)
+	if _search:
+		_search.track(node)
 	if node.is_node_ready():
 		apply_color_to_item(node)
 		apply_task_icon(node)
@@ -136,6 +147,8 @@ func refresh_all_slots() -> void:
 		_tooltip_rework.set_enabled(_conf.get("tooltip_rework", true))
 	if _compat:
 		_apply_compat_config()
+	if _search:
+		_search.set_enabled(_conf.get("search_box", true))
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_load_recipe_data()
@@ -143,6 +156,12 @@ func refresh_all_slots() -> void:
 	var interface = get_node_or_null("/root/Map/Core/UI/Interface")
 	if interface and "tooltipDelay" in interface:
 		_apply_tooltip_delay(interface)
+
+
+func _keep_search_last() -> void:
+	if _search and _search.is_inside_tree():
+		var root = get_tree().root
+		root.move_child(_search, root.get_child_count() - 1)
 
 
 func _apply_compat_config() -> void:
@@ -182,9 +201,10 @@ func _read_config() -> Dictionary:
 		"price_per_slot":     true,
 		"tooltip_rework":     true,
 		"compat_highlight":   true,
+		"search_box":         true,
 		"task_have_count":    true,
 		"compat_color":       Color("#ffffff46"),
-		"task_marker_corner": 0,
+		"task_marker_corner": 3,
 		"cat_colors": {
 			"Ammo":        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY),
 			"Armor":       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY),
@@ -224,9 +244,10 @@ func _read_config() -> Dictionary:
 	result["price_per_slot"]     = _get_bool(cfg, "Bool", "pricePerSlot",        true)
 	result["tooltip_rework"]     = _get_bool(cfg, "Bool", "tooltipRework",       true)
 	result["task_have_count"]    = _get_bool(cfg, "Bool", "taskHaveCount",       true)
+	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
 	result["compat_color"]       = _get_color(cfg, "Color", "compatHighlightColor", Color("#ffffff46"))
-	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    0)
+	result["task_marker_corner"] = _get_int(cfg,  "Dropdown",  "taskMarkerCorner",    3)
 	result["cat_colors"] = {
 		"Ammo":        _get_color(cfg, "Color", "catAmmo",        Color(0.15, 0.65, 0.15, DEFAULT_OPACITY)),
 		"Armor":       _get_color(cfg, "Color", "catArmor",       Color(0.55, 0.15, 0.75, DEFAULT_OPACITY)),
@@ -337,6 +358,8 @@ func _walk_and_color(node: Node) -> void:
 	if _is_item_node(node):
 		if _compat:
 			_compat.track(node)
+		if _search:
+			_search.track(node)
 		apply_color_to_item(node)
 		apply_task_icon(node)
 		apply_recipe_hover(node)
@@ -529,7 +552,7 @@ func apply_task_icon(item: Node) -> void:
 	circle_style.content_margin_right = 3
 	icon_label.add_theme_stylebox_override("normal", circle_style)
 	# Position: configurable corner
-	var corner: int = _conf.get("task_marker_corner", 0)
+	var corner: int = _conf.get("task_marker_corner", 3)
 	match corner:
 		1: # Bottom Left
 			icon_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)

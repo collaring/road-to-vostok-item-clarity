@@ -17,6 +17,8 @@ var _tabs: TabContainer = null
 var _status: Label = null
 var _cfg: ConfigFile = null
 var _dirty := false
+var _popup_owners: Array = []  # OptionButtons / ColorPickerButtons with popups
+var _occupied_by_us := false
 
 
 func _ready() -> void:
@@ -51,6 +53,11 @@ func _process(_delta: float) -> void:
 	_button.visible = open
 	if not open and _window != null and _window.visible:
 		_window.visible = false
+	_set_occupied(_window != null and _window.visible)
+
+
+func _exit_tree() -> void:
+	_set_occupied(false)
 
 
 func _is_inventory_open() -> bool:
@@ -61,6 +68,21 @@ func _is_inventory_open() -> bool:
 	if "isDead" in _game_data and _game_data.isDead:
 		return false
 	return bool(_game_data.interface)
+
+
+# The game polls left_mouse / context in Interface._physics_process, so GUI
+# handling alone doesn't stop clicks on this window reaching the inventory.
+# While the window is open we set gameData.isOccupied, which makes the game
+# skip all item interaction. Only cleared again if we were the ones to set it.
+func _set_occupied(on: bool) -> void:
+	if _game_data == null or not ("isOccupied" in _game_data):
+		return
+	if on and (_occupied_by_us or not _game_data.isOccupied):
+		_game_data.isOccupied = true  # re-applied if the game clears it meanwhile
+		_occupied_by_us = true
+	elif not on and _occupied_by_us:
+		_game_data.isOccupied = false
+		_occupied_by_us = false
 
 
 func _toggle_window() -> void:
@@ -152,6 +174,7 @@ func _build_window() -> void:
 
 
 func _rebuild_tabs() -> void:
+	_popup_owners = []
 	for child in _tabs.get_children():
 		_tabs.remove_child(child)
 		child.queue_free()
@@ -210,6 +233,7 @@ func _make_control(section: String, key: String, entry: Dictionary) -> Control:
 				opt.add_item(str(o))
 			opt.select(int(value))
 			opt.item_selected.connect(func(i): _set_value(section, key, i))
+			_popup_owners.append(opt)
 			return opt
 		"Float":
 			var box = HBoxContainer.new()
@@ -238,6 +262,7 @@ func _make_control(section: String, key: String, entry: Dictionary) -> Control:
 			picker.custom_minimum_size = Vector2(64, 24)
 			picker.focus_mode = Control.FOCUS_NONE
 			picker.color_changed.connect(func(c): _set_value(section, key, c))
+			_popup_owners.append(picker)
 			return picker
 	return null
 
