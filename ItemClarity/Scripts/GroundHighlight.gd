@@ -30,7 +30,7 @@ var in_shelters := false
 
 var _game_data: Resource = null
 var _material: ShaderMaterial = null
-var _pickups: Array = []
+var _pickups: Dictionary = {}  # instance id -> Pickup
 var _outlined: Dictionary = {}  # pickup instance id -> Array[MeshInstance3D]
 var _timer := 0.0
 
@@ -41,7 +41,7 @@ func _ready() -> void:
 	shader.code = OUTLINE_SHADER
 	_material = ShaderMaterial.new()
 	_material.shader = shader
-	set_color(Color("#ffffff0f"))
+	set_color(Color("#ffffff26"))
 
 
 func configure(on: bool, dist: float, color: Color, shelters: bool) -> void:
@@ -60,8 +60,8 @@ func set_color(color: Color) -> void:
 
 
 func track(node: Node) -> void:
-	if node is Pickup and node not in _pickups:
-		_pickups.append(node)
+	if node is Pickup:
+		_pickups[node.get_instance_id()] = node
 
 
 func _process(delta: float) -> void:
@@ -79,24 +79,42 @@ func _process(delta: float) -> void:
 		return
 	var origin: Vector3 = camera.global_position
 	var max_sq: float = distance * distance
-	var alive: Array = []
-	for pickup in _pickups:
+	for id in _pickups.keys():
+		var pickup = _pickups[id]
 		if not is_instance_valid(pickup):
+			_pickups.erase(id)
+			_outlined.erase(id)  # its meshes were freed along with it
 			continue
-		alive.append(pickup)
 		if not pickup.is_inside_tree():
 			continue
-		var near: bool = pickup.global_position.distance_squared_to(origin) <= max_sq
-		var id: int = pickup.get_instance_id()
+		var near: bool = _eligible(pickup) and pickup.global_position.distance_squared_to(origin) <= max_sq
 		if near and not _outlined.has(id):
 			_outline(pickup)
 		elif not near and _outlined.has(id):
 			_unoutline(id)
-	# Forget outlines on pickups that were picked up / freed
-	for id in _outlined.keys():
-		if not is_instance_id_valid(id):
-			_outlined.erase(id)
-	_pickups = alive
+
+
+# Only items the player can actually pick up: the game's Interactor only acts
+# on colliders in the "Item" group (trader displays and set dressing aren't),
+# and guns held by living NPCs are skipped until the NPC dies.
+func _eligible(pickup: Node) -> bool:
+	if not pickup.is_in_group("Item"):
+		return false
+	if pickup is CollisionObject3D and pickup.collision_layer == 0:
+		return false
+	# Trader shelves: TraderDisplay.gd freezes its Pickups and disables their
+	# collision shape, which is what makes them impossible to pick up
+	if "collision" in pickup and pickup.collision is CollisionShape3D and pickup.collision.disabled:
+		return false
+	var parent = pickup.get_parent()
+	var script = parent.get_script() if parent else null
+	if script and script.resource_path.ends_with("TraderDisplay.gd"):
+		return false
+	while parent != null:
+		if "dead" in parent and parent.get("dead") is bool:
+			return parent.dead
+		parent = parent.get_parent()
+	return true
 
 
 func _outline(pickup: Node) -> void:

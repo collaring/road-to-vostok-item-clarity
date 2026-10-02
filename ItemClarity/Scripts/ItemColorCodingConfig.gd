@@ -207,8 +207,8 @@ func build_defaults() -> ConfigFile:
 	_add(_config, "Color", "groundHighlightColor", {
 		"name"       = "Outline Color",
 		"tooltip"    = "Color of the ground item outline. Lower the alpha for a subtler outline.",
-		"default"    = Color("#ffffff0f"),
-		"value"      = Color("#ffffff0f"),
+		"default"    = Color("#ffffff26"),
+		"value"      = Color("#ffffff26"),
 		"allowAlpha" = true,
 		"category"   = "Ground Items"
 	})

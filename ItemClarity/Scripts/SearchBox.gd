@@ -25,7 +25,7 @@ var color := Color(1.0, 0.85, 0.30, 0.90)
 var _game_data: Resource = null
 var _root: Control = null
 var _edit: LineEdit = null
-var _items: Array = []
+var _items: Dictionary = {}      # instance id -> tracked item node
 var _affected: Array = []        # item nodes we changed (outline or dim)
 var _tokens: PackedStringArray = []
 var _haystacks: Dictionary = {}  # resource_path -> normalized search text
@@ -95,8 +95,7 @@ func set_color(value: Color) -> void:
 
 
 func track(item: Node) -> void:
-	if item not in _items:
-		_items.append(item)
+	_items[item.get_instance_id()] = item
 	if not _tokens.is_empty():
 		_apply(item)
 
@@ -274,9 +273,12 @@ func _refilter() -> void:
 	_clear()
 	if _tokens.is_empty():
 		return
-	_items = _items.filter(func(n): return is_instance_valid(n))
-	for item in _items:
-		_apply(item)
+	for id in _items.keys():
+		var item = _items[id]
+		if is_instance_valid(item):
+			_apply(item)
+		else:
+			_items.erase(id)
 
 
 func _apply(item: Node) -> void:

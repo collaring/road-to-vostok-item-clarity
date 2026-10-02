@@ -16,6 +16,7 @@ var _game_data: Resource = null
 var _counts: Dictionary = {}      # resource_path -> int
 var _counted_at: int = -CACHE_TIME_MS
 var _shelter_cache: Dictionary = {}  # file path -> {"mtime": int, "counts": Dictionary}
+var _world: Dictionary = {}  # instance id -> LootContainer / Pickup, fed by Main
 
 
 func _ready() -> void:
@@ -26,6 +27,11 @@ func get_count(path: String) -> int:
 	if Time.get_ticks_msec() - _counted_at >= CACHE_TIME_MS:
 		_recount()
 	return _counts.get(path, 0)
+
+
+func track(node: Node) -> void:
+	if node is LootContainer or node is Pickup:
+		_world[node.get_instance_id()] = node
 
 
 func invalidate() -> void:
@@ -85,23 +91,17 @@ func _count_live_shelter(ui: Node) -> void:
 		# The open container's contents live in the container grid until closed
 		if "containerGrid" in ui and ui.containerGrid:
 			_count_item_nodes(ui.containerGrid)
-	var map = get_node_or_null("/root/Map")
-	if map:
-		_walk_world(map, open_container)
-
-
-func _walk_world(node: Node, skip: Node) -> void:
-	if node == skip:
-		return
-	if node is LootContainer:
-		_count_slots(node.storage)
-	elif node is Pickup:
-		if node.slotData:
+	for id in _world.keys():
+		var node = _world[id]
+		if not is_instance_valid(node):
+			_world.erase(id)
+			continue
+		if node == open_container or not node.is_inside_tree():
+			continue
+		if node is LootContainer:
+			_count_slots(node.storage)
+		elif node.slotData:
 			_count_slot(node.slotData)
-	elif node.name == "UI":
-		return  # inventory UI is counted separately
-	for child in node.get_children():
-		_walk_world(child, skip)
 
 
 func _shelter_counts(path: String) -> Dictionary:

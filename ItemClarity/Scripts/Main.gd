@@ -1,6 +1,5 @@
 extends Node
 
-const BORDER_THICKNESS = 3
 const OVERLAY_NODE_NAME = "_icc_border"
 const TASK_ICON_NODE_NAME = "_icc_task"
 const CONFIG_PATH = "user://MCM/ItemClarity/config.ini"
@@ -81,6 +80,8 @@ func _ready() -> void:
 func _on_node_added(node: Node) -> void:
 	if _ground:
 		_ground.track(node)
+	if _counter:
+		_counter.track(node)
 	if _search and node != _search and node.get_parent() == get_tree().root:
 		_keep_search_last.call_deferred()
 	if not _is_item_node(node):
@@ -170,7 +171,7 @@ func _apply_ground_config() -> void:
 	_ground.configure(
 		_conf.get("ground_highlight", true),
 		_conf.get("ground_distance", 8.0),
-		_conf.get("ground_color", Color("#ffffff0f")),
+		_conf.get("ground_color", Color("#ffffff26")),
 		_conf.get("ground_shelters", false))
 
 
@@ -220,7 +221,7 @@ func _read_config() -> Dictionary:
 		"search_box":         true,
 		"ground_highlight":   true,
 		"ground_distance":    8.0,
-		"ground_color":       Color("#ffffff0f"),
+		"ground_color":       Color("#ffffff26"),
 		"ground_shelters":    false,
 		"task_have_count":    true,
 		"compat_color":       Color("#ffffff46"),
@@ -266,7 +267,7 @@ func _read_config() -> Dictionary:
 	result["task_have_count"]    = _get_bool(cfg, "Bool", "taskHaveCount",       true)
 	result["ground_highlight"]   = _get_bool(cfg, "Bool", "groundHighlight",     true)
 	result["ground_distance"]    = _get_float(cfg, "Float", "groundHighlightDistance", 8.0)
-	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff0f"))
+	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff26"))
 	result["ground_shelters"]    = _get_bool(cfg, "Bool", "groundHighlightShelters", false)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
@@ -387,6 +388,8 @@ func _scan_existing_items() -> void:
 func _walk_and_color(node: Node) -> void:
 	if _ground:
 		_ground.track(node)
+	if _counter:
+		_counter.track(node)
 	if _is_item_node(node):
 		if _compat:
 			_compat.track(node)
@@ -764,14 +767,6 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 		vbox.move_child(recipe_label, insert_after_idx + 1)
 		_tooltip_recipe_label = recipe_label
 		insert_after_idx += 1
-
-
-func _dump_children(node: Node, depth: int) -> String:
-	var indent = "  ".repeat(depth)
-	var s = indent + node.name + " (" + node.get_class() + ")\n"
-	for child in node.get_children():
-		s += _dump_children(child, depth + 1)
-	return s
 
 
 func _find_config_node() -> Node:

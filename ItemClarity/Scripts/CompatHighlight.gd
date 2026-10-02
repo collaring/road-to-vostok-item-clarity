@@ -10,7 +10,7 @@ var enabled := true
 var color := Color("#ffffff46")
 var interface: Node = null  # set by Main when the Interface node appears
 
-var _items: Array = []            # tracked item nodes (Panels with slotData)
+var _items: Dictionary = {}       # instance id -> tracked item node (Panel with slotData)
 var _highlighted: Array = []      # item nodes currently showing a highlight
 var _source_path: String = ""     # resource path of the item we highlight for
 var _compat_cache: Dictionary = {}  # resource_path -> Dictionary of compatible paths
@@ -29,8 +29,7 @@ func set_color(value: Color) -> void:
 
 
 func track(item: Node) -> void:
-	if item not in _items:
-		_items.append(item)
+	_items[item.get_instance_id()] = item
 	# A new item appearing (opening a container, splitting a stack) while a
 	# highlight is active should light up too
 	if _source_path != "":
@@ -62,9 +61,12 @@ func _process(_delta: float) -> void:
 	_source_path = path
 	if path == "":
 		return
-	_items = _items.filter(func(n): return is_instance_valid(n))
-	for item in _items:
-		_apply(item)
+	for id in _items.keys():
+		var item = _items[id]
+		if is_instance_valid(item):
+			_apply(item)
+		else:
+			_items.erase(id)
 
 
 func _apply(item: Node) -> void:
