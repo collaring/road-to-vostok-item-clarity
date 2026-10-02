@@ -17,6 +17,7 @@ var _tooltip_rework: Node = null
 var _compat: Node = null
 var _counter: Node = null
 var _search: Node = null
+var _ground: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -55,6 +56,9 @@ func _ready() -> void:
 	add_child(_compat)
 	_counter = load("res://ItemClarity/Scripts/ItemCounter.gd").new()
 	add_child(_counter)
+	_ground = load("res://ItemClarity/Scripts/GroundHighlight.gd").new()
+	add_child(_ground)
+	_apply_ground_config()
 	# Search must be the root's last child so it gets keyboard input before the game
 	_search = load("res://ItemClarity/Scripts/SearchBox.gd").new()
 	_search.set_enabled(_conf.get("search_box", true))
@@ -75,6 +79,8 @@ func _ready() -> void:
 
 
 func _on_node_added(node: Node) -> void:
+	if _ground:
+		_ground.track(node)
 	if _search and node != _search and node.get_parent() == get_tree().root:
 		_keep_search_last.call_deferred()
 	if not _is_item_node(node):
@@ -149,6 +155,8 @@ func refresh_all_slots() -> void:
 		_apply_compat_config()
 	if _search:
 		_search.set_enabled(_conf.get("search_box", true))
+	if _ground:
+		_apply_ground_config()
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_load_recipe_data()
@@ -156,6 +164,14 @@ func refresh_all_slots() -> void:
 	var interface = get_node_or_null("/root/Map/Core/UI/Interface")
 	if interface and "tooltipDelay" in interface:
 		_apply_tooltip_delay(interface)
+
+
+func _apply_ground_config() -> void:
+	_ground.configure(
+		_conf.get("ground_highlight", true),
+		_conf.get("ground_distance", 8.0),
+		_conf.get("ground_color", Color("#ffffff0f")),
+		_conf.get("ground_shelters", false))
 
 
 func _keep_search_last() -> void:
@@ -202,6 +218,10 @@ func _read_config() -> Dictionary:
 		"tooltip_rework":     true,
 		"compat_highlight":   true,
 		"search_box":         true,
+		"ground_highlight":   true,
+		"ground_distance":    8.0,
+		"ground_color":       Color("#ffffff0f"),
+		"ground_shelters":    false,
 		"task_have_count":    true,
 		"compat_color":       Color("#ffffff46"),
 		"task_marker_corner": 3,
@@ -244,6 +264,10 @@ func _read_config() -> Dictionary:
 	result["price_per_slot"]     = _get_bool(cfg, "Bool", "pricePerSlot",        true)
 	result["tooltip_rework"]     = _get_bool(cfg, "Bool", "tooltipRework",       true)
 	result["task_have_count"]    = _get_bool(cfg, "Bool", "taskHaveCount",       true)
+	result["ground_highlight"]   = _get_bool(cfg, "Bool", "groundHighlight",     true)
+	result["ground_distance"]    = _get_float(cfg, "Float", "groundHighlightDistance", 8.0)
+	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff0f"))
+	result["ground_shelters"]    = _get_bool(cfg, "Bool", "groundHighlightShelters", false)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
 	result["compat_color"]       = _get_color(cfg, "Color", "compatHighlightColor", Color("#ffffff46"))
@@ -282,6 +306,12 @@ func _get_int(cfg: ConfigFile, section: String, key: String, default: int) -> in
 	var v = cfg.get_value(section, key, default)
 	if v is Dictionary: return int(v.get("value", default))
 	return int(v)
+
+
+func _get_float(cfg: ConfigFile, section: String, key: String, default: float) -> float:
+	var v = cfg.get_value(section, key, default)
+	if v is Dictionary: return float(v.get("value", default))
+	return float(v)
 
 
 func _get_bool(cfg: ConfigFile, section: String, key: String, default: bool) -> bool:
@@ -355,6 +385,8 @@ func _scan_existing_items() -> void:
 
 
 func _walk_and_color(node: Node) -> void:
+	if _ground:
+		_ground.track(node)
 	if _is_item_node(node):
 		if _compat:
 			_compat.track(node)

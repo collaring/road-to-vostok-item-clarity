@@ -184,6 +184,43 @@ func build_defaults() -> ConfigFile:
 		"category" = "General"
 	})
 
+	# ── Ground Items ──────────────────────────────────────────────────────────
+	_add(_config, "Bool", "groundHighlight", {
+		"name"     = "Outline Nearby Ground Items",
+		"tooltip"  = "Draws an outline around items lying on the ground when you're close to them. If you also use Loot Highlight, turn one of them off to avoid double outlines.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "Ground Items"
+	})
+
+	_add(_config, "Float", "groundHighlightDistance", {
+		"name"     = "Outline Distance (meters)",
+		"tooltip"  = "How close you need to be for ground items to be outlined.",
+		"default"  = 8.0,
+		"value"    = 8.0,
+		"minRange" = 1.0,
+		"maxRange" = 30.0,
+		"step"     = 1.0,
+		"category" = "Ground Items"
+	})
+
+	_add(_config, "Color", "groundHighlightColor", {
+		"name"       = "Outline Color",
+		"tooltip"    = "Color of the ground item outline. Lower the alpha for a subtler outline.",
+		"default"    = Color("#ffffff0f"),
+		"value"      = Color("#ffffff0f"),
+		"allowAlpha" = true,
+		"category"   = "Ground Items"
+	})
+
+	_add(_config, "Bool", "groundHighlightShelters", {
+		"name"     = "Outline in Shelters",
+		"tooltip"  = "Also outline items lying around inside your shelters.",
+		"default"  = false,
+		"value"    = false,
+		"category" = "Ground Items"
+	})
+
 	# ── Category Colors ───────────────────────────────────────────────────────
 	# Alpha controls tint opacity. Transparent (alpha=0) means no color is applied.
 	_add(_config, "Color", "catAmmo", {
@@ -396,8 +433,9 @@ func build_defaults() -> ConfigFile:
 
 	# ── Category ordering ────────────────────────────────────────────────────
 	_config.set_value("Category", "General",         { "menu_pos" = 1 })
-	_config.set_value("Category", "Category Colors", { "menu_pos" = 2 })
-	_config.set_value("Category", "Rarity Colors",   { "menu_pos" = 3 })
+	_config.set_value("Category", "Ground Items",    { "menu_pos" = 2 })
+	_config.set_value("Category", "Category Colors", { "menu_pos" = 3 })
+	_config.set_value("Category", "Rarity Colors",   { "menu_pos" = 4 })
 
 	return _config
 
