@@ -17,6 +17,7 @@ var _compat: Node = null
 var _counter: Node = null
 var _search: Node = null
 var _ground: Node = null
+var _stats: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -53,6 +54,10 @@ func _ready() -> void:
 	_compat = load("res://ItemClarity/Scripts/CompatHighlight.gd").new()
 	_apply_compat_config()
 	add_child(_compat)
+	_stats = load("res://ItemClarity/Scripts/StatPreview.gd").new()
+	_stats.compat = _compat
+	_stats.configure(_conf.get("stat_preview", true), _conf.get("stat_preview", true))
+	add_child(_stats)
 	_counter = load("res://ItemClarity/Scripts/ItemCounter.gd").new()
 	add_child(_counter)
 	_ground = load("res://ItemClarity/Scripts/GroundHighlight.gd").new()
@@ -95,6 +100,8 @@ func _on_node_added(node: Node) -> void:
 				_compat.interface = node
 			if _counter:
 				_counter.interface = node
+			if _stats:
+				_stats.interface = node
 			if _search:
 				_search.interface = node
 		return
@@ -158,6 +165,8 @@ func refresh_all_slots() -> void:
 		_search.set_enabled(_conf.get("search_box", true))
 	if _ground:
 		_apply_ground_config()
+	if _stats:
+		_stats.configure(_conf.get("stat_preview", true), _conf.get("stat_preview", true))
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_load_recipe_data()
@@ -219,6 +228,7 @@ func _read_config() -> Dictionary:
 		"tooltip_rework":     true,
 		"compat_highlight":   true,
 		"search_box":         true,
+		"stat_preview":       true,
 		"ground_highlight":   true,
 		"ground_distance":    8.0,
 		"ground_color":       Color("#ffffff26"),
@@ -269,6 +279,7 @@ func _read_config() -> Dictionary:
 	result["ground_distance"]    = _get_float(cfg, "Float", "groundHighlightDistance", 8.0)
 	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff26"))
 	result["ground_shelters"]    = _get_bool(cfg, "Bool", "groundHighlightShelters", false)
+	result["stat_preview"]       = _get_bool(cfg, "Bool", "statPreview",         true)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
 	result["compat_color"]       = _get_color(cfg, "Color", "compatHighlightColor", Color("#ffffff46"))

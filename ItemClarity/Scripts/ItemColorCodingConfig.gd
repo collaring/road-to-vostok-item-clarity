@@ -65,6 +65,13 @@ func merge_defaults(cfg: ConfigFile, defaults: ConfigFile) -> bool:
 				if merged != cur:
 					cfg.set_value(section, key, merged)
 					changed = true
+	# Drop settings that were removed in newer versions
+	for section in ["Bool", "Dropdown", "Float", "Color"]:
+		if cfg.has_section(section):
+			for key in cfg.get_section_keys(section):
+				if not defaults.has_section_key(section, key):
+					cfg.erase_section_key(section, key)
+					changed = true
 	return changed
 
 
@@ -158,6 +165,15 @@ func build_defaults() -> ConfigFile:
 		"value"    = true,
 		"category" = "General"
 	})
+
+	_add(_config, "Bool", "statPreview", {
+		"name"     = "Preview Stat Changes",
+		"tooltip"  = "While hovering food, drinks or medical items, the Character panel shows what your health, energy, hydration, mental and body temperature would be after using it. Hovering a stat outlines every item that would raise it.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
 
 	_add(_config, "Bool", "compatHighlight", {
 		"name"     = "Highlight Compatible Items",
