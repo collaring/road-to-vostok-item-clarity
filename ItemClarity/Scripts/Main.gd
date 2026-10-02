@@ -12,12 +12,14 @@ var _crafting_recipe_paths: Dictionary = {}
 var _tooltip_quest_label: Label = null
 var _tooltip_recipe_label: Label = null
 var _tooltip_price_label: Label = null
+var _tooltip_root: Control = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
 # Cached config — loaded once on ready, refreshed by MCM on save
 var _conf: Dictionary = {}
-var _traders_mtime: int = -1      # last-seen modification time of Traders.tres
+var _config_mtime: int = -1       # last-seen modification time of config.ini
+var _traders_mtime: int = -1     # last-seen modification time of Traders.tres
 var _traders_os_path: String = "" # resolved OS path cached at startup
 
 # All category and rarity colors are now read from MCM config.
@@ -36,6 +38,11 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_conf = _read_config()
+	_config_mtime = FileAccess.get_modified_time(CONFIG_PATH)
+	var panel = load("res://ItemClarity/Scripts/SettingsPanel.gd").new()
+	panel.config_node = _find_config_node()
+	panel.main_node = self
+	add_child(panel)
 	_traders_os_path = ProjectSettings.globalize_path("user://Traders.tres")
 	_traders_mtime = FileAccess.get_modified_time(_traders_os_path)
 	_load_task_data()
@@ -71,6 +78,9 @@ func _on_node_added(node: Node) -> void:
 
 
 func _on_rescan_timer() -> void:
+	# Pick up hand edits to config.ini (or saves from anything else) without a restart
+	if FileAccess.get_modified_time(CONFIG_PATH) != _config_mtime:
+		refresh_all_slots()
 	var mtime: int = FileAccess.get_modified_time(_traders_os_path)
 	if mtime == _traders_mtime:
 		# File unchanged — skip expensive reload entirely
@@ -102,6 +112,7 @@ func _find_and_setup_tooltip(node: Node) -> void:
 
 func refresh_all_slots() -> void:
 	_conf = _read_config()
+	_config_mtime = FileAccess.get_modified_time(CONFIG_PATH)
 	_remove_all_overlays(get_tree().get_root())
 	_load_task_data()
 	_load_recipe_data()
@@ -384,15 +395,6 @@ func _load_task_data() -> void:
 			if noted_task != null and noted_task.resource_path != "":
 				noted_paths[noted_task.resource_path] = true
 
-	var completed_by_trader: Dictionary = {}
-	if trader_save:
-		completed_by_trader = {
-			"Generalist": _to_string_array(trader_save.get("generalist") if trader_save.get("generalist") != null else []),
-			"Doctor":     _to_string_array(trader_save.get("doctor")     if trader_save.get("doctor")     != null else []),
-			"Gunsmith":   _to_string_array(trader_save.get("gunsmith")   if trader_save.get("gunsmith")   != null else []),
-			"Grandma":    _to_string_array(trader_save.get("grandma")    if trader_save.get("grandma")    != null else []),
-		}
-
 	var trader_dirs = DirAccess.get_directories_at("res://Traders/")
 	if trader_dirs.is_empty():
 		return
@@ -405,7 +407,13 @@ func _load_task_data() -> void:
 		if not ("tasks" in trader) or trader.tasks == null:
 			continue
 
-		var completed: Array = completed_by_trader.get(trader_id, [])
+		# TraderSave stores completed task names in a lowercase property per trader
+		# (generalist, doctor, gunsmith, driver, hunter, ...)
+		var completed: Array = []
+		if trader_save:
+			var saved = trader_save.get(trader_id.to_lower())
+			if saved != null:
+				completed = _to_string_array(saved)
 
 		for task in trader.tasks:
 			if task == null or not ("name" in task) or not ("deliver" in task):
@@ -556,15 +564,14 @@ func _on_task_item_mouse_exited() -> void:
 func _process(_delta: float) -> void:
 	if _tooltip_quest_label == null and _tooltip_recipe_label == null and _tooltip_price_label == null:
 		return
-	# Walk up: Label -> Elements (VBox) -> Margin -> Panel -> Tooltip (Control)
 	var ref_label = _tooltip_quest_label if _tooltip_quest_label != null else (_tooltip_recipe_label if _tooltip_recipe_label != null else _tooltip_price_label)
-	if not is_instance_valid(ref_label):
+	if not is_instance_valid(ref_label) or not is_instance_valid(_tooltip_root):
 		_tooltip_quest_label = null
 		_tooltip_recipe_label = null
 		_tooltip_price_label = null
+		_tooltip_root = null
 		return
-	var tooltip_root = ref_label.get_parent().get_parent().get_parent().get_parent()
-	var tooltip_visible = is_instance_valid(tooltip_root) and tooltip_root.visible
+	var tooltip_visible = _tooltip_root.is_visible_in_tree()
 	if _tooltip_quest_label != null and is_instance_valid(_tooltip_quest_label):
 		if not tooltip_visible:
 			_tooltip_quest_label.visible = false
@@ -597,11 +604,19 @@ func _setup_tooltip_label(tooltip: Node) -> void:
 	if _tooltip_quest_label != null and _tooltip_recipe_label != null and _tooltip_price_label != null:
 		return
 
-	var vbox = tooltip.get_node_or_null("Panel/Margin/Elements")
+	# The container was "Panel/Margin/Elements" before the Oct 2026 update and is
+	# now "Panel/Margin/VBox"; locate it via the Info label so renames don't break us
+	var info_node = tooltip.find_child("Info", true, false)
+	var vbox = info_node.get_parent() if info_node else null
+	if not vbox is VBoxContainer:
+		vbox = tooltip.get_node_or_null("Panel/Margin/VBox")
+	if vbox == null:
+		vbox = tooltip.get_node_or_null("Panel/Margin/Elements")
 	if vbox == null:
 		return
-
-	var info_node = vbox.get_node_or_null("Info")
+	_tooltip_root = tooltip
+	if info_node and info_node.get_parent() != vbox:
+		info_node = null
 	var insert_after_idx = info_node.get_index() if info_node else vbox.get_child_count() - 1
 
 	# Insert price label first, so it appears at the top
