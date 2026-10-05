@@ -9,6 +9,22 @@ const FILE_PATH = "user://MCM/ItemClarity"
 # [section, key] pairs in definition order, used by the built-in settings panel
 var ordered_keys: Array = []
 
+# Section headings in the built-in panel's General tab. Kept out of the
+# setting dictionaries themselves so MCM never sees an unknown field.
+const GROUPS = {
+	"colorCodingMode": "Inventory",  "searchBox": "Inventory",
+	"tooltipRework": "Tooltips",     "tooltipDelay": "Tooltips",
+	"pricePerSlot": "Tooltips",      "recipeTooltip": "Tooltips",
+	"taskMarking": "Tasks",          "notedTasksOnly": "Tasks",
+	"taskHaveCount": "Tasks",        "taskMarkerCorner": "Tasks",
+	"statPreview": "Highlights",     "compatHighlight": "Highlights",
+	"compatHighlightColor": "Highlights",
+	"groundHighlight": "Ground Items",          "groundHighlightDistance": "Ground Items",
+	"groundHighlightColor": "Ground Items",     "groundHighlightShelters": "Ground Items",
+	"containerHighlight": "Containers",         "containerHighlightDistance": "Containers",
+	"containerHighlightColor": "Containers",
+}
+
 
 func _ready() -> void:
 	var defaults = build_defaults()
@@ -65,8 +81,8 @@ func merge_defaults(cfg: ConfigFile, defaults: ConfigFile) -> bool:
 				if merged != cur:
 					cfg.set_value(section, key, merged)
 					changed = true
-	# Drop settings that were removed in newer versions
-	for section in ["Bool", "Dropdown", "Float", "Color"]:
+	# Drop settings (and tabs, e.g. the old "Ground Items") removed in newer versions
+	for section in ["Bool", "Dropdown", "Float", "Color", "Category"]:
 		if cfg.has_section(section):
 			for key in cfg.get_section_keys(section):
 				if not defaults.has_section_key(section, key):
@@ -90,6 +106,49 @@ func build_defaults() -> ConfigFile:
 			"Rarity",
 			"None"
 		],
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "searchBox", {
+		"name"     = "Inventory Search Box",
+		"tooltip"  = "Adds a search box while the inventory is open. Matching items are outlined and everything else is dimmed. Searches name, type, caliber and category, so '762' finds 7.62x39.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "tooltipRework", {
+		"name"     = "Tooltip Rework",
+		"tooltip"  = "Smoother inventory tooltips: they stay open while you move the mouse, follow the cursor every frame, update instantly when you move to another item, and stay on screen.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Float", "tooltipDelay", {
+		"name"     = "Tooltip Delay (seconds)",
+		"tooltip"  = "How long to hover an item before its tooltip appears. Default game value is 0.5.",
+		"default"  = 0.1,
+		"value"    = 0.1,
+		"minRange" = 0.0,
+		"maxRange" = 2.0,
+		"step"     = 0.05,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "pricePerSlot", {
+		"name"     = "Price per Slot Tooltip",
+		"tooltip"  = "Shows the item's value divided by the number of inventory slots it occupies when hovering in the inventory.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "recipeTooltip", {
+		"name"     = "Show Crafting Recipes in Tooltip",
+		"tooltip"  = "Shows which crafting recipes use this item as an ingredient when hovering it in the inventory.",
+		"default"  = true,
+		"value"    = true,
 		"category" = "General"
 	})
 
@@ -131,41 +190,6 @@ func build_defaults() -> ConfigFile:
 		"category" = "General"
 	})
 
-	_add(_config, "Bool", "recipeTooltip", {
-		"name"     = "Show Crafting Recipes in Tooltip",
-		"tooltip"  = "Shows which crafting recipes use this item as an ingredient when hovering it in the inventory.",
-		"default"  = true,
-		"value"    = true,
-		"category" = "General"
-	})
-
-	_add(_config, "Bool", "pricePerSlot", {
-		"name"     = "Price per Slot Tooltip",
-		"tooltip"  = "Shows the item's value divided by the number of inventory slots it occupies when hovering in the inventory.",
-		"default"  = true,
-		"value"    = true,
-		"category" = "General"
-	})
-
-	_add(_config, "Float", "tooltipDelay", {
-		"name"     = "Tooltip Delay (seconds)",
-		"tooltip"  = "How long to hover an item before its tooltip appears. Default game value is 0.5.",
-		"default"  = 0.1,
-		"value"    = 0.1,
-		"minRange" = 0.0,
-		"maxRange" = 2.0,
-		"step"     = 0.05,
-		"category" = "General"
-	})
-
-	_add(_config, "Bool", "searchBox", {
-		"name"     = "Inventory Search Box",
-		"tooltip"  = "Adds a search box while the inventory is open. Matching items are outlined and everything else is dimmed. Searches name, type, caliber and category, so '762' finds 7.62x39.",
-		"default"  = true,
-		"value"    = true,
-		"category" = "General"
-	})
-
 	_add(_config, "Bool", "statPreview", {
 		"name"     = "Preview Stat Changes",
 		"tooltip"  = "While hovering food, drinks or medical items, the Character panel shows what your health, energy, hydration, mental and body temperature would be after using it. Hovering a stat outlines every item that would raise it.",
@@ -173,7 +197,6 @@ func build_defaults() -> ConfigFile:
 		"value"    = true,
 		"category" = "General"
 	})
-
 
 	_add(_config, "Bool", "compatHighlight", {
 		"name"     = "Highlight Compatible Items",
@@ -192,21 +215,14 @@ func build_defaults() -> ConfigFile:
 		"category"   = "General"
 	})
 
-	_add(_config, "Bool", "tooltipRework", {
-		"name"     = "Tooltip Rework",
-		"tooltip"  = "Smoother inventory tooltips: they stay open while you move the mouse, follow the cursor every frame, update instantly when you move to another item, and stay on screen.",
-		"default"  = true,
-		"value"    = true,
-		"category" = "General"
-	})
 
-	# ── Ground Items ──────────────────────────────────────────────────────────
+	# ── World Highlights: Ground Items ────────────────────────────────────────
 	_add(_config, "Bool", "groundHighlight", {
 		"name"     = "Outline Nearby Ground Items",
 		"tooltip"  = "Draws an outline around items lying on the ground when you're close to them. If you also use Loot Highlight, turn one of them off to avoid double outlines.",
 		"default"  = true,
 		"value"    = true,
-		"category" = "Ground Items"
+		"category" = "World Highlights"
 	})
 
 	_add(_config, "Float", "groundHighlightDistance", {
@@ -217,7 +233,7 @@ func build_defaults() -> ConfigFile:
 		"minRange" = 1.0,
 		"maxRange" = 30.0,
 		"step"     = 1.0,
-		"category" = "Ground Items"
+		"category" = "World Highlights"
 	})
 
 	_add(_config, "Color", "groundHighlightColor", {
@@ -226,7 +242,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color("#ffffff26"),
 		"value"      = Color("#ffffff26"),
 		"allowAlpha" = true,
-		"category"   = "Ground Items"
+		"category"   = "World Highlights"
 	})
 
 	_add(_config, "Bool", "groundHighlightShelters", {
@@ -234,7 +250,36 @@ func build_defaults() -> ConfigFile:
 		"tooltip"  = "Also outline items lying around inside your shelters.",
 		"default"  = false,
 		"value"    = false,
-		"category" = "Ground Items"
+		"category" = "World Highlights"
+	})
+
+	# ── World Highlights: Containers ──────────────────────────────────────────
+	_add(_config, "Bool", "containerHighlight", {
+		"name"     = "Outline Unsearched Containers",
+		"tooltip"  = "Outlines openable containers you haven't searched yet this raid when you're close. The outline disappears once you've opened it.",
+		"default"  = false,
+		"value"    = false,
+		"category" = "World Highlights"
+	})
+
+	_add(_config, "Float", "containerHighlightDistance", {
+		"name"     = "Container Outline Distance (meters)",
+		"tooltip"  = "How close you need to be for unsearched containers to be outlined.",
+		"default"  = 8.0,
+		"value"    = 8.0,
+		"minRange" = 1.0,
+		"maxRange" = 30.0,
+		"step"     = 1.0,
+		"category" = "World Highlights"
+	})
+
+	_add(_config, "Color", "containerHighlightColor", {
+		"name"       = "Container Outline Color",
+		"tooltip"    = "Color of the unsearched container outline.",
+		"default"    = Color("#ffd24d26"),
+		"value"      = Color("#ffd24d26"),
+		"allowAlpha" = true,
+		"category"   = "World Highlights"
 	})
 
 	# ── Category Colors ───────────────────────────────────────────────────────
@@ -449,7 +494,7 @@ func build_defaults() -> ConfigFile:
 
 	# ── Category ordering ────────────────────────────────────────────────────
 	_config.set_value("Category", "General",         { "menu_pos" = 1 })
-	_config.set_value("Category", "Ground Items",    { "menu_pos" = 2 })
+	_config.set_value("Category", "World Highlights", { "menu_pos" = 2 })
 	_config.set_value("Category", "Category Colors", { "menu_pos" = 3 })
 	_config.set_value("Category", "Rarity Colors",   { "menu_pos" = 4 })
 

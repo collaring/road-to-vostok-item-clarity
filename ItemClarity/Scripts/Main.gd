@@ -17,6 +17,7 @@ var _compat: Node = null
 var _counter: Node = null
 var _search: Node = null
 var _ground: Node = null
+var _task_icons: Dictionary = {}  # instance id -> [icon Label, item resource path]
 var _stats: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
@@ -80,6 +81,12 @@ func _ready() -> void:
 	timer.autostart = true
 	timer.timeout.connect(_on_rescan_timer)
 	add_child(timer)
+	# Fast timer: turns task markers green once you own enough
+	var icon_timer = Timer.new()
+	icon_timer.wait_time = 1.0
+	icon_timer.autostart = true
+	icon_timer.timeout.connect(_recolor_task_icons)
+	add_child(icon_timer)
 
 
 func _on_node_added(node: Node) -> void:
@@ -102,6 +109,8 @@ func _on_node_added(node: Node) -> void:
 				_counter.interface = node
 			if _stats:
 				_stats.interface = node
+			if _ground:
+				_ground.interface = node
 			if _search:
 				_search.interface = node
 		return
@@ -182,6 +191,10 @@ func _apply_ground_config() -> void:
 		_conf.get("ground_distance", 8.0),
 		_conf.get("ground_color", Color("#ffffff26")),
 		_conf.get("ground_shelters", false))
+	_ground.configure_containers(
+		_conf.get("container_highlight", false),
+		_conf.get("container_distance", 8.0),
+		_conf.get("container_color", Color("#ffd24d26")))
 
 
 func _keep_search_last() -> void:
@@ -233,6 +246,9 @@ func _read_config() -> Dictionary:
 		"ground_distance":    8.0,
 		"ground_color":       Color("#ffffff26"),
 		"ground_shelters":    false,
+		"container_highlight": false,
+		"container_distance": 8.0,
+		"container_color":    Color("#ffd24d26"),
 		"task_have_count":    true,
 		"compat_color":       Color("#ffffff46"),
 		"task_marker_corner": 3,
@@ -279,6 +295,9 @@ func _read_config() -> Dictionary:
 	result["ground_distance"]    = _get_float(cfg, "Float", "groundHighlightDistance", 8.0)
 	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff26"))
 	result["ground_shelters"]    = _get_bool(cfg, "Bool", "groundHighlightShelters", false)
+	result["container_highlight"] = _get_bool(cfg, "Bool", "containerHighlight",  false)
+	result["container_distance"] = _get_float(cfg, "Float", "containerHighlightDistance", 8.0)
+	result["container_color"]    = _get_color(cfg, "Color", "containerHighlightColor", Color("#ffd24d26"))
 	result["stat_preview"]       = _get_bool(cfg, "Bool", "statPreview",         true)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
@@ -625,6 +644,8 @@ func apply_task_icon(item: Node) -> void:
 			icon_label.offset_right = 2
 			icon_label.offset_bottom = -2
 	item.add_child(icon_label)
+	_task_icons[icon_label.get_instance_id()] = [icon_label, key]
+	_color_task_icon(icon_label, key)
 
 	# Invisible full-rect hover zone covers the whole item slot so hovering
 	# anywhere on the item triggers the tooltip, not just the "!" icon
@@ -636,6 +657,42 @@ func apply_task_icon(item: Node) -> void:
 	# Pass both the item node and the key so both price and task tooltips work
 	hover_zone.mouse_entered.connect(_on_task_item_mouse_entered.bind(item, key))
 	hover_zone.mouse_exited.connect(_on_task_item_mouse_exited)
+
+
+const TASK_COLOR = Color(1.0, 0.75, 0.0)       # gold: still needed
+const TASK_DONE_COLOR = Color(0.35, 0.9, 0.35)  # green: you own enough for every task
+
+
+func _recolor_task_icons() -> void:
+	if _task_icons.is_empty():
+		return
+	var interface = _tooltip_rework.interface if _tooltip_rework else null
+	if interface == null or not is_instance_valid(interface) or not interface.visible:
+		return  # markers are only seen with the inventory open
+	for id in _task_icons.keys():
+		var entry: Array = _task_icons[id]
+		if not is_instance_valid(entry[0]):
+			_task_icons.erase(id)
+			continue
+		_color_task_icon(entry[0], entry[1])
+
+
+func _color_task_icon(icon: Label, key: String) -> void:
+	var done := false
+	if _counter and _conf.get("task_have_count", true):
+		var needed := 0
+		for task in _task_needed_paths.get(key, []):
+			needed += int(task["count"])
+		done = needed > 0 and _counter.get_count(key) >= needed
+	# Theme overrides trigger a redraw, so only touch the icon when it flips
+	if icon.has_meta("icc_done") and icon.get_meta("icc_done") == done:
+		return
+	icon.set_meta("icc_done", done)
+	var color: Color = TASK_DONE_COLOR if done else TASK_COLOR
+	icon.add_theme_color_override("font_color", color)
+	var style = icon.get_theme_stylebox("normal")
+	if style is StyleBoxFlat:
+		style.border_color = color
 
 
 func _on_task_item_mouse_entered(item: Node, key: String) -> void:

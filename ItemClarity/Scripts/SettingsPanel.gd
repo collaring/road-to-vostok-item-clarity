@@ -191,6 +191,11 @@ func _rebuild_tabs() -> void:
 		scroll.add_child(list)
 		lists[category] = list
 
+	# Constants aren't instance properties, so read GROUPS from the script itself
+	var groups: Dictionary = {}
+	if config_node and config_node.get_script():
+		groups = config_node.get_script().get_script_constant_map().get("GROUPS", {})
+	var last_group: Dictionary = {}  # category -> group heading last shown in it
 	for pair in _ordered_keys():
 		var section: String = pair[0]
 		var key: String = pair[1]
@@ -203,6 +208,10 @@ func _rebuild_tabs() -> void:
 		var control = _make_control(section, key, entry)
 		if control == null:
 			continue
+		var group: String = groups.get(key, "")
+		if group != "" and last_group.get(category, "") != group:
+			_add_group_header(lists[category], group, last_group.has(category))
+			last_group[category] = group
 		var row = HBoxContainer.new()
 		row.tooltip_text = entry.get("tooltip", "")
 		var label = Label.new()
@@ -214,6 +223,20 @@ func _rebuild_tabs() -> void:
 		row.add_child(label)
 		row.add_child(control)
 		lists[category].add_child(row)
+
+
+func _add_group_header(list: VBoxContainer, title: String, spaced: bool) -> void:
+	if spaced:
+		var gap = Control.new()
+		gap.custom_minimum_size = Vector2(0, 6)
+		list.add_child(gap)
+	var label = Label.new()
+	label.text = title.to_upper()
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65))
+	list.add_child(label)
+	var line = HSeparator.new()
+	list.add_child(line)
 
 
 func _make_control(section: String, key: String, entry: Dictionary) -> Control:
