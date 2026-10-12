@@ -19,6 +19,7 @@ var _search: Node = null
 var _ground: Node = null
 var _task_icons: Dictionary = {}  # instance id -> [icon Label, item resource path]
 var _stats: Node = null
+var _tools: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -61,6 +62,10 @@ func _ready() -> void:
 	add_child(_stats)
 	_counter = load("res://ItemClarity/Scripts/ItemCounter.gd").new()
 	add_child(_counter)
+	_tools = load("res://ItemClarity/Scripts/InventoryTools.gd").new()
+	_tools.counter = _counter
+	_apply_tools_config()
+	add_child(_tools)
 	_ground = load("res://ItemClarity/Scripts/GroundHighlight.gd").new()
 	add_child(_ground)
 	_apply_ground_config()
@@ -111,6 +116,8 @@ func _on_node_added(node: Node) -> void:
 				_stats.interface = node
 			if _ground:
 				_ground.interface = node
+			if _tools:
+				_tools.interface = node
 			if _search:
 				_search.interface = node
 		return
@@ -174,6 +181,8 @@ func refresh_all_slots() -> void:
 		_search.set_enabled(_conf.get("search_box", true))
 	if _ground:
 		_apply_ground_config()
+	if _tools:
+		_apply_tools_config()
 	if _stats:
 		_stats.configure(_conf.get("stat_preview", true), _conf.get("stat_preview", true))
 	_remove_all_overlays(get_tree().get_root())
@@ -183,6 +192,12 @@ func refresh_all_slots() -> void:
 	var interface = get_node_or_null("/root/Map/Core/UI/Interface")
 	if interface and "tooltipDelay" in interface:
 		_apply_tooltip_delay(interface)
+
+
+func _apply_tools_config() -> void:
+	_tools.configure(
+		_conf.get("inventory_tools", true),
+		_conf.get("quick_stack_range", 6.0))
 
 
 func _apply_ground_config() -> void:
@@ -241,6 +256,8 @@ func _read_config() -> Dictionary:
 		"tooltip_rework":     true,
 		"compat_highlight":   true,
 		"search_box":         true,
+		"inventory_tools":    true,
+		"quick_stack_range":  6.0,
 		"stat_preview":       true,
 		"ground_highlight":   true,
 		"ground_distance":    8.0,
@@ -299,6 +316,8 @@ func _read_config() -> Dictionary:
 	result["container_distance"] = _get_float(cfg, "Float", "containerHighlightDistance", 8.0)
 	result["container_color"]    = _get_color(cfg, "Color", "containerHighlightColor", Color("#ffd24d26"))
 	result["stat_preview"]       = _get_bool(cfg, "Bool", "statPreview",         true)
+	result["inventory_tools"]    = _get_bool(cfg, "Bool", "inventoryTools",      true)
+	result["quick_stack_range"]  = _get_float(cfg, "Float", "quickStackRange",   6.0)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)
 	result["compat_highlight"]   = _get_bool(cfg, "Bool", "compatHighlight",     true)
 	result["compat_color"]       = _get_color(cfg, "Color", "compatHighlightColor", Color("#ffffff46"))
@@ -702,22 +721,24 @@ func _on_task_item_mouse_entered(item: Node, key: String) -> void:
 		_hovered_price_text = ""
 		return
 	_hovered_item_key = key
-	var condition := 1.0
-	if "condition" in item.slotData and item.slotData.condition != null:
-		condition = float(item.slotData.condition)
-		if condition > 1.0:
-			condition /= 100.0
-	# Pre-compute price-per-slot so _process doesn't call load() every frame
+	# Pre-compute price-per-slot so _process doesn't recompute it every frame
 	_hovered_price_text = ""
 	if _conf.get("price_per_slot", true) and key != "":
-		var item_res = load(key)
-		if item_res != null:
-			var base_value: float = float(item_res.get("value"))
-			var value: float = base_value * condition
-			var size: Vector2 = item_res.get("size")
-			var slots: int = max(1, int(size.x) * int(size.y))
-			var pps: int = int(round(value / float(slots)))
-			_hovered_price_text = str(pps) + "€ / slot"
+		var data = item.slotData.itemData
+		var value: float
+		if item.has_method("Value"):
+			# Same number the tooltip shows as "Value": stack amount for ammo,
+			# loaded rounds for magazines/weapons, condition and attachments
+			value = float(item.Value())
+		else:
+			var condition := 1.0
+			if "condition" in item.slotData and item.slotData.condition != null:
+				condition = float(item.slotData.condition) / 100.0
+			value = float(data.value) * condition
+		var size: Vector2 = data.size
+		var slots: int = max(1, int(size.x) * int(size.y))
+		var pps: int = int(round(value / float(slots)))
+		_hovered_price_text = str(pps) + "€ / slot"
 
 # "x2 for Gunsmith: Warm Meal (have 1/2)"
 func _format_task_lines(key: String, task_info: Array) -> Array:

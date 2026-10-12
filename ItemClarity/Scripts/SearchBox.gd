@@ -76,11 +76,12 @@ func _attach() -> void:
 	var parent = tooltip.get_parent()
 	if _edit.get_parent() != parent:
 		_edit.reparent(parent, false)
-	var tip_idx: int = tooltip.get_index()
-	if _edit.get_index() > tip_idx:
-		parent.move_child(_edit, tip_idx)
-	elif _edit.get_index() < tip_idx - 1:
-		parent.move_child(_edit, tip_idx - 1)
+	# Draw before whichever overlay comes first: the right-click menu or tooltip
+	var anchor_idx: int = tooltip.get_index()
+	if "context" in interface and interface.context is Control and interface.context.get_parent() == parent:
+		anchor_idx = min(anchor_idx, interface.context.get_index())
+	if _edit.get_index() > anchor_idx:
+		parent.move_child(_edit, anchor_idx)
 
 
 func set_enabled(value: bool) -> void:

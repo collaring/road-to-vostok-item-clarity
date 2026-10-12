@@ -13,6 +13,7 @@ var ordered_keys: Array = []
 # setting dictionaries themselves so MCM never sees an unknown field.
 const GROUPS = {
 	"colorCodingMode": "Inventory",  "searchBox": "Inventory",
+	"inventoryTools": "Inventory",   "quickStackRange": "Inventory",
 	"tooltipRework": "Tooltips",     "tooltipDelay": "Tooltips",
 	"pricePerSlot": "Tooltips",      "recipeTooltip": "Tooltips",
 	"taskMarking": "Tasks",          "notedTasksOnly": "Tasks",
@@ -114,6 +115,25 @@ func build_defaults() -> ConfigFile:
 		"tooltip"  = "Adds a search box while the inventory is open. Matching items are outlined and everything else is dimmed. Searches name, type, caliber and category, so '762' finds 7.62x39.",
 		"default"  = true,
 		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "inventoryTools", {
+		"name"     = "Sort & Quick Stack Buttons",
+		"tooltip"  = "Adds a Sort button (which also merges partial stacks) above your inventory, and above the open container while in a shelter. In shelters, Quick Stack moves inventory items into nearby containers that already hold the same item.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Float", "quickStackRange", {
+		"name"     = "Quick Stack Range (meters)",
+		"tooltip"  = "How close a shelter container must be for Quick Stack to put items into it.",
+		"default"  = 6.0,
+		"value"    = 6.0,
+		"minRange" = 2.0,
+		"maxRange" = 20.0,
+		"step"     = 1.0,
 		"category" = "General"
 	})
 

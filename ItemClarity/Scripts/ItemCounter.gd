@@ -38,6 +38,18 @@ func invalidate() -> void:
 	_counted_at = -CACHE_TIME_MS
 
 
+# Live LootContainers in the world (used by Quick Stack)
+func get_containers() -> Array:
+	var result: Array = []
+	for id in _world.keys():
+		var node = _world[id]
+		if not is_instance_valid(node):
+			_world.erase(id)
+		elif node is LootContainer:
+			result.append(node)
+	return result
+
+
 func _get_interface() -> Node:
 	if interface == null or not is_instance_valid(interface):
 		interface = get_node_or_null("/root/Map/Core/UI/Interface")

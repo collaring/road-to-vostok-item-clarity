@@ -10,7 +10,8 @@ extends Node
 
 const PREVIEW_NODE_NAME = "_icc_preview"
 const UP_COLOR = Color(0.45, 0.85, 1.0)
-const DOWN_COLOR = Color(1.0, 0.55, 0.2)
+const DOWN_COLOR = Color(1.0, 0.3, 0.3)  # red, like the game's negative tooltip values
+const WASTE_COLOR = Color(1.0, 0.55, 0.2)  # capped at 100: part of the item is wasted
 # Vital.Type enum order -> gameData / ItemData property
 const STAT_PROPS = ["health", "energy", "hydration", "mental", "temperature"]
 
@@ -141,7 +142,10 @@ func _show_preview(data: Resource) -> void:
 		overlay.vertical_alignment = label.vertical_alignment
 		var font_size = label.get_theme_font_size("font_size")
 		overlay.add_theme_font_size_override("font_size", font_size)
-		overlay.add_theme_color_override("font_color", UP_COLOR if delta > 0 else DOWN_COLOR)
+		var number_color: Color = UP_COLOR if delta > 0 else DOWN_COLOR
+		if current + delta > 100.0:
+			number_color = WASTE_COLOR
+		overlay.add_theme_color_override("font_color", number_color)
 
 		# Small "+5" just right of the digits (not the column edge), raised
 		var change = Label.new()
