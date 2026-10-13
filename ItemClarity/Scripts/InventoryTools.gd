@@ -29,7 +29,7 @@ enum { NONE, PARTIAL, DONE }
 
 # Sort order by item folder (res://Items/<Category>/...)
 const CATEGORY_ORDER = [
-	"Weapons", "Ammo", "Attachments", "Grenades", "Knives", "Medical",
+	"Ammo", "Weapons", "Attachments", "Grenades", "Knives", "Medical",
 	"Consumables", "Backpacks", "Rigs", "Armor", "Helmets", "Belts",
 	"Clothing", "Keys", "Electronics", "Instruments", "Fishing", "Books",
 	"Lore", "Misc",
@@ -478,7 +478,7 @@ func _sort(grid) -> void:
 	for it in items:
 		originals.append([it, it.global_position, it.rotated])
 
-	# Category order first; if that doesn't pack, biggest-first always packs best
+	# Category order first (ammo on top); then two fallbacks that pack tighter
 	var by_category := items.duplicate()
 	by_category.sort_custom(func(a, b):
 		var ca := _category_index(a)
@@ -489,10 +489,23 @@ func _sort(grid) -> void:
 			return a.slotData.itemData.name < b.slotData.itemData.name
 		return a.slotData.amount > b.slotData.amount
 	)
+	# Same category order, but biggest first inside each category: packs far
+	# better than strict name order, and keeps groups (ammo first) together
+	var by_category_size := by_category.duplicate()
+	by_category_size.sort_custom(func(a, b):
+		var ca := _category_index(a)
+		var cb := _category_index(b)
+		if ca != cb:
+			return ca < cb
+		if _area(a) != _area(b):
+			return _area(a) > _area(b)
+		return a.slotData.itemData.name < b.slotData.itemData.name
+	)
+	# Last resort before giving up: biggest first regardless of category
 	var by_size := by_category.duplicate()
 	by_size.sort_custom(func(a, b): return _area(a) > _area(b))
 
-	for order in [by_category, by_size]:
+	for order in [by_category, by_category_size, by_size]:
 		for it in items:
 			if grid.items.has(it):
 				grid.Pick(it)

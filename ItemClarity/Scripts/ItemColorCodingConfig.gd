@@ -390,13 +390,13 @@ func build_defaults() -> ConfigFile:
 	# ── World Highlights: Crosshair ───────────────────────────────────────────
 	_add(_config, "Dropdown", "crosshairMode", {
 		"name"    = "Crosshair Dot",
-		"tooltip" = "A small dot at the center of the screen so you can see exactly what you're pointing at. 'When Aiming at Items & Containers' only shows it while you're looking at something you can pick up or open.",
+		"tooltip" = "A small dot at the center of the screen so you can see exactly what you're pointing at. 'When Aiming at Items, Containers & Doors' only shows it while you're looking at something you can pick up or open.",
 		"default" = 2,
 		"value"   = 2,
 		"options" = [
 			"Off",
 			"Always",
-			"When Aiming at Items & Containers"
+			"When Aiming at Items, Containers & Doors"
 		],
 		"category" = "World Highlights"
 	})

@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 # Small dot at the centre of the screen, either always or only while the game's
-# Interactor ray is on an item you can pick up or a container (the same check
+# Interactor ray is on an item you can pick up, a container or a door (the same check
 # the game uses before letting you interact), so you can see exactly where
 # you're pointing without guessing where the screen centre is.
 
@@ -84,7 +84,9 @@ func _on_target() -> bool:
 		return false
 	if target.is_in_group("Item"):
 		return true
-	return target.is_in_group("Interactable") and target.owner is LootContainer
+	if not target.is_in_group("Interactable"):
+		return false
+	return target.owner is LootContainer or target.owner is Door
 
 
 func _get_interactor() -> Node:
