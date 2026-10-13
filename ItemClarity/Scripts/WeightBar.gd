@@ -13,14 +13,23 @@ const BAR_HEIGHT = 8.0
 const GAP = 6.0
 const LABEL_H = 16.0
 
-const COLOR_OK = Color(0.35, 0.85, 0.35)
-const COLOR_WARN = Color(0.95, 0.8, 0.2)
-const COLOR_OVER = Color(1.0, 0.35, 0.3)
+# Defaults; the actual colours are user settings (Colors > Carry Weight Bar)
+const DEFAULT_OK = Color(0.35, 0.85, 0.35)
+const DEFAULT_WARN = Color(0.95, 0.8, 0.2)
+const DEFAULT_OVER = Color(1.0, 0.35, 0.3)
+const SEARCH_BOX_H = 30.0  # the search box sits directly under the inventory
 const COLOR_BG = Color(0.06, 0.06, 0.06, 0.85)
 const COLOR_BORDER = Color(0.3, 0.3, 0.3)
 
 var enabled := true
 var interface: Node = null  # set by Main
+
+enum Position { UNDER_STATS, UNDER_INVENTORY }
+var position_mode: int = Position.UNDER_STATS
+var below_search := true      # Under Inventory: leave room for the search box
+var color_ok := DEFAULT_OK
+var color_warn := DEFAULT_WARN
+var color_over := DEFAULT_OVER
 
 var _root: Control = null
 var _bar: Control = null
@@ -35,8 +44,15 @@ var _preview := 0.0      # weight a hovered container item would add
 var _share := 0.0        # weight of a hovered inventory item
 
 
-func configure(on: bool) -> void:
+func configure(on: bool, pos: int, search_on: bool, ok: Color, warn: Color, over: Color) -> void:
 	enabled = on
+	if pos != position_mode:
+		_bounds = Rect2()  # re-measure against the new anchor
+	position_mode = pos
+	below_search = search_on
+	color_ok = ok
+	color_warn = warn
+	color_over = over
 	if not enabled and _root and is_instance_valid(_root):
 		_root.visible = false
 
@@ -67,14 +83,21 @@ func _process(_delta: float) -> void:
 	if _root == null or not is_instance_valid(_root):
 		_make()
 	var ui = _get_interface()
-	var stats: Control = ui.get_node_or_null("Equipment/Stats") if ui else null
-	var show: bool = enabled and ui != null and ui.visible and stats != null and stats.is_visible_in_tree() \
+	# Anchor: the equipment stats row, or the inventory (some mods, like Gear
+	# Storage Expansion, use the space under the equipment stats)
+	var anchor: Control = null
+	if ui:
+		if position_mode == Position.UNDER_INVENTORY:
+			anchor = ui.inventoryUI if "inventoryUI" in ui and ui.inventoryUI is Control else null
+		else:
+			anchor = ui.get_node_or_null("Equipment/Stats")
+	var show: bool = enabled and ui != null and ui.visible and anchor != null and anchor.is_visible_in_tree() \
 		and "currentInventoryCapacity" in ui
 	_root.visible = show
 	if not show:
 		return
 	_attach(ui)
-	_place(stats)
+	_place(anchor)
 
 	_weight = float(ui.currentInventoryWeight)
 	_capacity = max(0.01, float(ui.currentInventoryCapacity))
@@ -103,18 +126,23 @@ func _update_label() -> void:
 		if after > _capacity and _weight <= _capacity:
 			text += "  Overweight"
 		_label.text = text
-		_label.add_theme_color_override("font_color", COLOR_OVER if after > _capacity else Color(0.8, 0.8, 0.8))
+		_label.add_theme_color_override("font_color", _readable(color_over) if after > _capacity else Color(0.8, 0.8, 0.8))
 	else:
 		_label.text = "%.1f / %.1f kg" % [_weight, _capacity]
-		_label.add_theme_color_override("font_color", COLOR_OVER if _weight > _capacity else Color(0.75, 0.75, 0.75))
+		_label.add_theme_color_override("font_color", _readable(color_over) if _weight > _capacity else Color(0.75, 0.75, 0.75))
 
 
 func _color_for(fraction: float) -> Color:
 	if fraction > 1.0:
-		return COLOR_OVER
+		return color_over
 	if fraction >= 0.5:
-		return COLOR_WARN
-	return COLOR_OK
+		return color_warn
+	return color_ok
+
+
+# Label text uses the colour at full opacity so it stays legible
+func _readable(c: Color) -> Color:
+	return Color(c.r, c.g, c.b, 1.0)
 
 
 func _draw_bar() -> void:
@@ -165,15 +193,19 @@ func _attach(ui: Node) -> void:
 		parent.move_child(_root, anchor_idx)
 
 
-# Directly under the equipment stats row (CC / value / insulation), same width
-func _place(stats: Control) -> void:
+# Directly under the anchor (equipment stats row or inventory), same width.
+# Under the inventory it also clears the search box, which sits right there.
+func _place(anchor: Control) -> void:
 	var now := Time.get_ticks_msec()
 	if now - _bounds_at > 250 or _bounds.size == Vector2.ZERO:
 		_bounds_at = now
-		_bounds = _covered_rect(stats, Rect2())
+		_bounds = _covered_rect(anchor, Rect2())
 	if _bounds.size.x < 64:
 		return
-	_root.global_position = Vector2(_bounds.position.x, _bounds.end.y + GAP).round()
+	var y: float = _bounds.end.y + GAP
+	if position_mode == Position.UNDER_INVENTORY:
+		y = _bounds.end.y + 8.0 + (SEARCH_BOX_H + GAP if below_search else 0.0)
+	_root.global_position = Vector2(_bounds.position.x, y).round()
 	_root.size = Vector2(_bounds.size.x, BAR_HEIGHT + LABEL_H)
 	_bar.position = Vector2.ZERO
 	_bar.size = Vector2(_bounds.size.x, BAR_HEIGHT)
@@ -186,6 +218,8 @@ func _covered_rect(node: Node, acc: Rect2) -> Rect2:
 	if node is Control:
 		if not node.visible or node.name.begins_with("_icc"):
 			return acc
+		if "slotData" in node:
+			return acc  # items sit inside the grid; skip them
 		var r: Rect2 = node.get_global_rect()
 		if r.size.x > 0 and r.size.y > 0:
 			acc = r if acc.size == Vector2.ZERO else acc.merge(r)

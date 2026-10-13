@@ -74,7 +74,7 @@ func _ready() -> void:
 	_apply_tools_config()
 	add_child(_tools)
 	_weight_bar = load("res://ItemClarity/Scripts/WeightBar.gd").new()
-	_weight_bar.configure(_conf.get("weight_bar", true))
+	_apply_weight_bar_config()
 	add_child(_weight_bar)
 	_crosshair = load("res://ItemClarity/Scripts/Crosshair.gd").new()
 	add_child(_crosshair)
@@ -204,7 +204,7 @@ func refresh_all_slots() -> void:
 	if _crosshair:
 		_apply_crosshair_config()
 	if _weight_bar:
-		_weight_bar.configure(_conf.get("weight_bar", true))
+		_apply_weight_bar_config()
 	if _stats:
 		_stats.configure(_conf.get("stat_preview", true), _conf.get("stat_preview", true))
 	_remove_all_overlays(get_tree().get_root())
@@ -216,9 +216,20 @@ func refresh_all_slots() -> void:
 		_apply_tooltip_delay(interface)
 
 
+func _apply_weight_bar_config() -> void:
+	var pos: int = _conf.get("weight_bar_position", 0)  # 0 under stats, 1 under inventory, 2 off
+	_weight_bar.configure(
+		pos != 2,
+		pos if pos != 2 else 0,
+		_conf.get("search_box", true),
+		_conf.get("weight_ok", Color(0.35, 0.85, 0.35)),
+		_conf.get("weight_warn", Color(0.95, 0.8, 0.2)),
+		_conf.get("weight_over", Color(1.0, 0.35, 0.3)))
+
+
 func _apply_crosshair_config() -> void:
 	_crosshair.configure(
-		_conf.get("crosshair_mode", 2),
+		_conf.get("crosshair_mode", 1),
 		_conf.get("crosshair_color", Color(1.0, 1.0, 1.0, 0.85)),
 		_conf.get("crosshair_size", 2.5))
 
@@ -310,7 +321,10 @@ func _read_config() -> Dictionary:
 		"compat_highlight":   true,
 		"search_box":         true,
 		"inventory_tools":    true,
-		"weight_bar":         true,
+		"weight_bar_position": 0,
+		"weight_ok":          Color(0.35, 0.85, 0.35),
+		"weight_warn":        Color(0.95, 0.8, 0.2),
+		"weight_over":        Color(1.0, 0.35, 0.3),
 		"quick_stack_range":  6.0,
 		"stat_preview":       true,
 		"ground_highlight":   true,
@@ -318,7 +332,7 @@ func _read_config() -> Dictionary:
 		"ground_color":       Color("#ffffff26"),
 		"ground_shelters":    false,
 		"world_style":        0,
-		"crosshair_mode":     2,
+		"crosshair_mode":     1,
 		"crosshair_color":    Color(1.0, 1.0, 1.0, 0.85),
 		"crosshair_size":     2.5,
 		"world_dot_centered": true,
@@ -373,7 +387,9 @@ func _read_config() -> Dictionary:
 	result["ground_highlight"]   = _get_bool(cfg, "Bool", "groundHighlight",     true)
 	result["ground_distance"]    = _get_float(cfg, "Float", "groundHighlightDistance", 8.0)
 	result["ground_color"]       = _get_color(cfg, "Color", "groundHighlightColor", Color("#ffffff26"))
-	result["crosshair_mode"]     = _get_int(cfg, "Dropdown", "crosshairMode", 2)
+	# New key (was crosshairMode): the options were reordered, so old saved
+	# positions would map to the wrong choice; everyone starts on the default
+	result["crosshair_mode"]     = _get_int(cfg, "Dropdown", "crosshairDot", 1)
 	result["crosshair_color"]    = _get_color(cfg, "Color", "crosshairColor", Color(1.0, 1.0, 1.0, 0.85))
 	result["crosshair_size"]     = _get_float(cfg, "Float", "crosshairSize", 2.5)
 	result["world_style"]        = _get_int(cfg, "Dropdown", "worldHighlightStyle", 0)
@@ -390,7 +406,10 @@ func _read_config() -> Dictionary:
 		"icTaskDetails": KeyUtil.make_bind(cfg.get_value("Keycode", "icTaskDetails", KEY_ALT)),
 		"icLockItem":    KeyUtil.make_bind(cfg.get_value("Keycode", "icLockItem", KEY_L)),
 	}
-	result["weight_bar"]         = _get_bool(cfg, "Bool", "weightBar",           true)
+	result["weight_bar_position"] = _get_int(cfg, "Dropdown", "weightBarPosition", 0)
+	result["weight_ok"]          = _get_color(cfg, "Color", "weightOk",   Color(0.35, 0.85, 0.35))
+	result["weight_warn"]        = _get_color(cfg, "Color", "weightWarn", Color(0.95, 0.8, 0.2))
+	result["weight_over"]        = _get_color(cfg, "Color", "weightOver", Color(1.0, 0.35, 0.3))
 	result["inventory_tools"]    = _get_bool(cfg, "Bool", "inventoryTools",      true)
 	result["quick_stack_range"]  = _get_float(cfg, "Float", "quickStackRange",   6.0)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)

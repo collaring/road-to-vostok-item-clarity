@@ -5,7 +5,7 @@ extends CanvasLayer
 # the game uses before letting you interact), so you can see exactly where
 # you're pointing without guessing where the screen centre is.
 
-enum Mode { OFF, ALWAYS, ON_TARGET }
+enum Mode { ALWAYS, ON_TARGET, OFF }  # matches the dropdown order (Off last)
 
 var mode: int = Mode.ON_TARGET
 var color := Color(1, 1, 1, 0.85)
