@@ -26,6 +26,7 @@ var _task_icons: Dictionary = {}  # instance id -> [icon Label, item resource pa
 var _stats: Node = null
 var _tools: Node = null
 var _crosshair: Node = null
+var _weight_bar: Node = null
 var _hovered_item_key: String = ""
 var _hovered_price_text: String = ""  # cached price-per-slot string for current hover
 
@@ -72,6 +73,9 @@ func _ready() -> void:
 	_tools.counter = _counter
 	_apply_tools_config()
 	add_child(_tools)
+	_weight_bar = load("res://ItemClarity/Scripts/WeightBar.gd").new()
+	_weight_bar.configure(_conf.get("weight_bar", true))
+	add_child(_weight_bar)
 	_crosshair = load("res://ItemClarity/Scripts/Crosshair.gd").new()
 	add_child(_crosshair)
 	_apply_crosshair_config()
@@ -129,6 +133,8 @@ func _on_node_added(node: Node) -> void:
 				_ground.interface = node
 			if _tools:
 				_tools.interface = node
+			if _weight_bar:
+				_weight_bar.interface = node
 			if _search:
 				_search.interface = node
 		return
@@ -197,6 +203,8 @@ func refresh_all_slots() -> void:
 		_apply_tools_config()
 	if _crosshair:
 		_apply_crosshair_config()
+	if _weight_bar:
+		_weight_bar.configure(_conf.get("weight_bar", true))
 	if _stats:
 		_stats.configure(_conf.get("stat_preview", true), _conf.get("stat_preview", true))
 	_remove_all_overlays(get_tree().get_root())
@@ -225,6 +233,7 @@ func _apply_keybinds() -> void:
 	_search.hotkeys = [
 		[binds.get("icSort", KeyUtil.make_bind(0)), _tools.sort_hotkey],
 		[binds.get("icQuickStack", KeyUtil.make_bind(0)), _tools.quick_stack_hotkey],
+		[binds.get("icLockItem", KeyUtil.make_bind(KEY_L)), _tools.lock_hotkey],
 	]
 
 
@@ -301,6 +310,7 @@ func _read_config() -> Dictionary:
 		"compat_highlight":   true,
 		"search_box":         true,
 		"inventory_tools":    true,
+		"weight_bar":         true,
 		"quick_stack_range":  6.0,
 		"stat_preview":       true,
 		"ground_highlight":   true,
@@ -378,7 +388,9 @@ func _read_config() -> Dictionary:
 		"icSort":        KeyUtil.make_bind(cfg.get_value("Keycode", "icSort", 0)),
 		"icQuickStack":  KeyUtil.make_bind(cfg.get_value("Keycode", "icQuickStack", 0)),
 		"icTaskDetails": KeyUtil.make_bind(cfg.get_value("Keycode", "icTaskDetails", KEY_ALT)),
+		"icLockItem":    KeyUtil.make_bind(cfg.get_value("Keycode", "icLockItem", KEY_L)),
 	}
+	result["weight_bar"]         = _get_bool(cfg, "Bool", "weightBar",           true)
 	result["inventory_tools"]    = _get_bool(cfg, "Bool", "inventoryTools",      true)
 	result["quick_stack_range"]  = _get_float(cfg, "Float", "quickStackRange",   6.0)
 	result["search_box"]         = _get_bool(cfg, "Bool", "searchBox",           true)

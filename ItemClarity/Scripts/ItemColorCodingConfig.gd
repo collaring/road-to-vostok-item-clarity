@@ -15,6 +15,7 @@ var _headings: Array = []  # "Tab: Section" headings in first-use order
 const GROUPS = {
 	"colorCodingMode": "Inventory",  "searchBox": "Inventory",
 	"inventoryTools": "Inventory",   "quickStackRange": "Inventory",
+	"weightBar": "Inventory",
 	"tooltipRework": "Tooltips",     "tooltipDelay": "Tooltips",
 	"pricePerSlot": "Tooltips",      "recipeTooltip": "Tooltips",
 	"compareEquipped": "Tooltips",
@@ -31,7 +32,7 @@ const GROUPS = {
 	"crosshairMode": "Crosshair",              "crosshairColor": "Crosshair",
 	"crosshairSize": "Crosshair",
 	"icFocusSearch": "Inventory",              "icSort": "Inventory",
-	"icQuickStack": "Inventory",              "icTaskDetails": "Tasks",
+	"icQuickStack": "Inventory",              "icLockItem": "Inventory",              "icTaskDetails": "Tasks",
 	"catAmmo": "Category Colors",
 	"catArmor": "Category Colors",
 	"catAttachments": "Category Colors",
@@ -162,6 +163,14 @@ func build_defaults() -> ConfigFile:
 	_add(_config, "Bool", "searchBox", {
 		"name"     = "Inventory Search Box",
 		"tooltip"  = "Adds a search box while the inventory is open. Matching items are outlined and everything else is dimmed. Searches name, type, caliber and category, so '762' finds 7.62x39.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
+	_add(_config, "Bool", "weightBar", {
+		"name"     = "Carry Weight Bar",
+		"tooltip"  = "Shows a bar under your equipment stats filling toward your carry limit (green, yellow past 50%, red when overweight). Hovering an item in a container shows how much it would add.",
 		"default"  = true,
 		"value"    = true,
 		"category" = "General"
@@ -446,6 +455,20 @@ func build_defaults() -> ConfigFile:
 		"tooltip"        = "In a shelter, runs Quick Stack without clicking the button. Unbound by default.",
 		"default"        = 0,
 		"value"          = 0,
+		"type"           = "Key",
+		"default_type"   = "Key",
+		"altPressed"     = false,
+		"controlPressed" = false,
+		"metaPressed"    = false,
+		"shiftPressed"   = false,
+		"category"       = "Keybinds"
+	})
+
+	_add(_config, "Keycode", "icLockItem", {
+		"name"           = "Lock Item",
+		"tooltip"        = "Locks or unlocks the item under your mouse. Locked items (padlock icon) are never moved by Sort, merged, or Quick Stacked.",
+		"default"        = KEY_L,
+		"value"          = KEY_L,
 		"type"           = "Key",
 		"default_type"   = "Key",
 		"altPressed"     = false,

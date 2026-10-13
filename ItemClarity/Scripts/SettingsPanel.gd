@@ -20,6 +20,14 @@ var _cfg: ConfigFile = null
 var _dirty := false
 var _popup_owners: Array = []  # OptionButtons / ColorPickerButtons with popups
 var _occupied_by_us := false
+# Changes apply on their own a moment after you stop changing things (sliders
+# and colour pickers report every pixel of a drag; applying redraws every tint)
+const APPLY_DELAY_MS = 250
+var _apply_at: int = 0
+# Reset applies instantly too, so it needs a second click to confirm
+const RESET_CONFIRM_MS = 3000
+var _reset_button: Button = null
+var _reset_armed_until: int = 0
 # Keybind capture: the button waiting for a key, its setting, and the game
 # bindings suspended meanwhile (so Esc/Tab/etc. can't trigger game actions)
 var _capture_button: Button = null
@@ -82,6 +90,15 @@ func _process(_delta: float) -> void:
 			_window.visible = false
 	if _capture_button and (_window == null or not _window.visible):
 		_end_capture()
+	# Apply pending changes once you've paused, or right away if the window closed
+	if _apply_at != 0 and (Time.get_ticks_msec() >= _apply_at or _window == null or not _window.visible):
+		_apply_at = 0
+		if _dirty:
+			_save()
+	if _reset_armed_until != 0 and Time.get_ticks_msec() >= _reset_armed_until:
+		_reset_armed_until = 0
+		if _reset_button and is_instance_valid(_reset_button):
+			_reset_button.text = "Reset to Defaults"
 	# Only block inventory interaction when opened over the inventory
 	_set_occupied(_window != null and _window.visible and not _from_menu)
 
@@ -275,8 +292,7 @@ func _set_keybind(key: String, code: int, alt: bool, ctrl: bool, meta: bool, shi
 	entry["metaPressed"] = meta
 	entry["shiftPressed"] = shift
 	_cfg.set_value("Keycode", key, entry)
-	_dirty = true
-	_set_status("Unsaved changes")
+	_changed()
 
 
 func _is_inventory_open() -> bool:
@@ -385,23 +401,21 @@ func _build_window() -> void:
 	reset.focus_mode = Control.FOCUS_NONE
 	reset.pressed.connect(func():
 		_play_click()
-		_reset_to_defaults()
+		if Time.get_ticks_msec() < _reset_armed_until:
+			_reset_armed_until = 0
+			reset.text = "Reset to Defaults"
+			_reset_to_defaults()
+		else:
+			_reset_armed_until = Time.get_ticks_msec() + RESET_CONFIRM_MS
+			reset.text = "Click again to reset"
 	)
 	footer.add_child(reset)
+	_reset_button = reset
 	_status = Label.new()
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.add_theme_font_size_override("font_size", 12)
 	footer.add_child(_status)
-	var save = Button.new()
-	save.text = "Save"
-	save.custom_minimum_size = Vector2(80, 0)
-	save.focus_mode = Control.FOCUS_NONE
-	save.pressed.connect(func():
-		_play_click()
-		_save()
-	)
-	footer.add_child(save)
 
 
 func _rebuild_tabs() -> void:
@@ -569,8 +583,7 @@ func _set_value(section: String, key: String, value) -> void:
 	var entry: Dictionary = _cfg.get_value(section, key, {})
 	entry["value"] = value
 	_cfg.set_value(section, key, entry)
-	_dirty = true
-	_set_status("Unsaved changes")
+	_changed()
 
 
 func _reset_to_defaults() -> void:
@@ -585,9 +598,13 @@ func _reset_to_defaults() -> void:
 					for m in KeyUtil.MODIFIERS:
 						entry[m] = false
 				_cfg.set_value(section, key, entry)
-	_dirty = true
 	_rebuild_tabs()
-	_set_status("Defaults restored, press Save to apply")
+	_changed()
+
+
+func _changed() -> void:
+	_dirty = true
+	_apply_at = Time.get_ticks_msec() + APPLY_DELAY_MS
 
 
 func _save() -> void:

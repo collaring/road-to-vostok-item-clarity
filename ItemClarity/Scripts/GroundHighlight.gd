@@ -106,6 +106,7 @@ var _dot_for: Dictionary = {}  # outline material -> matching dot material
 # it doesn't expire behind the inventory screen before you see it.
 var _marks: Dictionary = {}          # instance id -> {node, tag, until, linger}
 var _mark_materials: Dictionary = {} # tag -> ShaderMaterial
+var _mark_colors: Dictionary = {}    # tag -> full-strength colour (marks fade from it)
 var _timer := 0.0
 
 
@@ -220,6 +221,7 @@ func track(node: Node) -> void:
 
 
 func _process(delta: float) -> void:
+	_fade_marks()
 	_timer += delta
 	if _timer < CHECK_INTERVAL:
 		return
@@ -268,12 +270,41 @@ func set_marks(tag: String, nodes: Array, color: Color, linger: float) -> void:
 		mat = _make_container_material(color)  # marks are always containers
 		_mark_materials[tag] = mat
 		_dot_for[mat] = _make_dot_material(_dot_shader, _dot_texture, color)
+	_mark_colors[tag] = color
 	_set_container_color(mat, color)
 	_set_dot_color(_dot_for[mat], color)
 	for node in nodes:
 		if is_instance_valid(node):
 			_marks[node.get_instance_id()] = {"node": node, "tag": tag, "until": -1, "linger": linger}
 	_timer = CHECK_INTERVAL  # show right away
+
+
+# Once a mark's countdown has started (inventory closed), its colour eases out
+# to nothing over that time instead of switching off. Runs every frame so the
+# fade is smooth, but only does work while something is actually fading.
+func _fade_marks() -> void:
+	if _marks.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	var ends: Dictionary = {}  # tag -> [latest until, linger]
+	for id in _marks:
+		var m: Dictionary = _marks[id]
+		if m["until"] != -1:
+			var cur = ends.get(m["tag"])
+			if cur == null or m["until"] > cur[0]:
+				ends[m["tag"]] = [m["until"], m["linger"]]
+	for tag in ends:
+		var mat: ShaderMaterial = _mark_materials.get(tag)
+		var base: Color = _mark_colors.get(tag, Color.WHITE)
+		if mat == null:
+			continue
+		var total: float = max(1.0, float(ends[tag][1]) * 1000.0)
+		var t: float = clamp(float(ends[tag][0] - now) / total, 0.0, 1.0)
+		t = t * t  # ease out: lingers bright, then falls away
+		_set_container_color(mat, Color(base.r, base.g, base.b, base.a * t))
+		var dot: ShaderMaterial = _dot_for.get(mat)
+		if dot:
+			dot.set_shader_parameter("dot_color", Color(base.r, base.g, base.b, DOT_ALPHA * t))
 
 
 func clear_marks(tag: String) -> void:

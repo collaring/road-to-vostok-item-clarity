@@ -40,7 +40,7 @@ var quick_range := 6.0
 var interface: Node = null    # set by Main
 var counter: Node = null      # ItemCounter: knows the LootContainers in the world
 var ground: Node = null       # GroundHighlight: marks the containers Quick Stack filled
-const FLASH_COLOR = Color(0.45, 1.0, 0.55, 0.75)
+const FLASH_COLOR = Color(1.0, 0.58, 0.15, 0.75)  # orange
 const FLASH_LINGER = 4.0      # seconds after the inventory closes
 
 var _game_data: Resource = null
@@ -131,6 +131,7 @@ func _process(_delta: float) -> void:
 	if _inv_row == null or not is_instance_valid(_inv_row) or not is_instance_valid(_cont_row):
 		_make_rows()
 	var ui = _get_interface()
+	_maintain_locks(ui)
 	var open := enabled and ui != null and _is_inventory_open()
 	var in_shelter := _in_shelter()
 
@@ -207,6 +208,184 @@ func _covered_rect(node: Node, acc: Rect2) -> Rect2:
 	for child in node.get_children():
 		acc = _covered_rect(child, acc)
 	return acc
+
+
+# ── Item locks ───────────────────────────────────────────────────────────────
+# Locked items are left alone by Sort (which packs around them), stack merging
+# and Quick Stack. During play the lock is a meta on the item node, so it
+# follows the item when dragged. The game saves inventory items as fresh
+# SlotData copies (Loader.SaveCharacter), dropping any meta, so inventory locks
+# are also kept as "x,y,file" keys (grid position + item type: how the game
+# restores inventory items on load) in our own file.
+#
+# The key list lives in memory across scene changes and only changes on real
+# events (lock/unlock, moving a locked item, a locked item leaving the
+# inventory). Items freed because a zone is unloading keep their keys, and
+# every item that appears in the inventory is checked against the list, so
+# locks come back however long the next zone takes to rebuild the inventory.
+
+const LOCK_META = "icc_locked"
+const LOCK_KEY_META = "icc_lock_key"     # key the locked node currently owns
+const LOCK_SEEN_META = "icc_lock_seen"   # already checked against the saved keys
+const LOCK_ICON_NAME = "_icc_lock"
+const LOCKS_PATH = "user://MCM/ItemClarity/locks.cfg"
+const LOCK_CHECK_MS = 500
+var _lock_keys: Dictionary = {}   # "x,y,file" -> true (what's saved)
+var _locked_nodes: Dictionary = {}  # instance id -> [node, key, interface id]
+var _locks_file_loaded := false
+var _locks_dirty := false
+var _locks_check_at: int = 0
+
+
+func is_locked(item: Node) -> bool:
+	return is_instance_valid(item) and item.has_meta(LOCK_META)
+
+
+func lock_hotkey() -> void:
+	var ui = _get_interface()
+	if ui == null:
+		return
+	var item = ui.hoverItem
+	if item == null or not is_instance_valid(item):
+		return
+	var grid = item.get_parent()
+	if grid != ui.inventoryGrid and grid != ui.containerGrid:
+		return
+	var on := not is_locked(item)
+	_set_locked(item, on)
+	if grid == ui.inventoryGrid:
+		var key := _lock_key(item)
+		if on:
+			_lock_keys[key] = true
+			_track_locked(item, key, ui)
+		else:
+			_lock_keys.erase(key)
+			_locked_nodes.erase(item.get_instance_id())
+		_locks_dirty = true
+	ui.PlayClick()
+	_say("Locked" if on else "Unlocked")
+	_write_locks()
+
+
+func _lock_key(item: Node) -> String:
+	return "%d,%d,%s" % [int(item.position.x), int(item.position.y), str(item.slotData.itemData.file)]
+
+
+func _track_locked(item: Node, key: String, ui: Node) -> void:
+	item.set_meta(LOCK_KEY_META, key)
+	_locked_nodes[item.get_instance_id()] = [item, key, ui.get_instance_id()]
+
+
+func _set_locked(item: Node, on: bool) -> void:
+	if on:
+		item.set_meta(LOCK_META, true)
+		if item.get_node_or_null(LOCK_ICON_NAME) == null:
+			var icon = Control.new()
+			icon.name = LOCK_ICON_NAME
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			icon.offset_left = -17
+			icon.offset_top = 3
+			icon.offset_right = -3
+			icon.offset_bottom = 19
+			icon.draw.connect(_draw_lock.bind(icon))
+			item.add_child(icon)
+	else:
+		item.remove_meta(LOCK_META)
+		var icon = item.get_node_or_null(LOCK_ICON_NAME)
+		if icon:
+			icon.queue_free()
+
+
+# Small padlock: shackle arc over a rounded body, with a dark outline
+func _draw_lock(icon: Control) -> void:
+	var w: float = icon.size.x
+	var h: float = icon.size.y
+	var body := Rect2(w * 0.12, h * 0.45, w * 0.76, h * 0.5)
+	var light := Color(0.9, 0.9, 0.9, 0.95)
+	var dark := Color(0, 0, 0, 0.7)
+	var shackle_c := Vector2(w * 0.5, h * 0.45)
+	var r: float = w * 0.26
+	icon.draw_arc(shackle_c, r, PI, TAU, 12, dark, 3.5, true)
+	icon.draw_arc(shackle_c, r, PI, TAU, 12, light, 1.8, true)
+	icon.draw_rect(body.grow(1.0), dark)
+	icon.draw_rect(body, light)
+	icon.draw_rect(Rect2(w * 0.46, h * 0.6, w * 0.08, h * 0.18), Color(0.15, 0.15, 0.15))
+
+
+func _read_locks() -> void:
+	_locks_file_loaded = true
+	var cfg = ConfigFile.new()
+	if cfg.load(LOCKS_PATH) != OK:
+		return
+	for e in cfg.get_value("locks", "inventory", []):
+		if e is Array and e.size() == 3:
+			_lock_keys["%d,%d,%s" % [int(e[0]), int(e[1]), str(e[2])]] = true
+
+
+func _write_locks() -> void:
+	if not _locks_dirty:
+		return
+	_locks_dirty = false
+	var entries: Array = []
+	for key in _lock_keys:
+		var parts: PackedStringArray = str(key).split(",", true, 2)
+		if parts.size() == 3:
+			entries.append([int(parts[0]), int(parts[1]), parts[2]])
+	var cfg = ConfigFile.new()
+	cfg.set_value("locks", "inventory", entries)
+	DirAccess.make_dir_recursive_absolute(LOCKS_PATH.get_base_dir())
+	cfg.save(LOCKS_PATH)
+
+
+func _maintain_locks(ui: Node) -> void:
+	if not _locks_file_loaded:
+		_read_locks()
+	var now := Time.get_ticks_msec()
+	if now < _locks_check_at:
+		return
+	_locks_check_at = now + LOCK_CHECK_MS
+	var ui_valid: bool = ui != null and is_instance_valid(ui) and "inventoryGrid" in ui and ui.inventoryGrid != null
+
+	# Locked items we were tracking: moved, left the inventory, or unloaded?
+	for id in _locked_nodes.keys():
+		var entry: Array = _locked_nodes[id]
+		var node = entry[0]
+		var key: String = entry[1]
+		var same_scene: bool = ui_valid and entry[2] == ui.get_instance_id()
+		if not is_instance_valid(node):
+			_locked_nodes.erase(id)
+			if same_scene:  # freed while the inventory is still up: dropped, used, sold
+				_lock_keys.erase(key)
+				_locks_dirty = true
+			continue  # freed with the zone: keep the key for the next one
+		if not ui_valid or not same_scene:
+			continue
+		if node.get_parent() != ui.inventoryGrid:
+			if node.get_parent() is Grid:  # moved into a container (those aren't saved)
+				_lock_keys.erase(key)
+				_locked_nodes.erase(id)
+				_locks_dirty = true
+			continue  # being dragged: wait until it lands
+		var now_key := _lock_key(node)
+		if now_key != key:
+			_lock_keys.erase(key)
+			_lock_keys[now_key] = true
+			_track_locked(node, now_key, ui)
+			_locks_dirty = true
+
+	# Newly appeared inventory items: re-lock the ones the saved keys describe
+	if ui_valid and not _lock_keys.is_empty():
+		for it in ui.inventoryGrid.get_children():
+			if it.has_meta(LOCK_SEEN_META) or not ("slotData" in it) or it.slotData == null or it.slotData.itemData == null:
+				continue
+			it.set_meta(LOCK_SEEN_META, true)
+			var key := _lock_key(it)
+			if _lock_keys.has(key) and not is_locked(it):
+				_set_locked(it, true)
+				_track_locked(it, key, ui)
+
+	_write_locks()
 
 
 # ── Hotkeys (called by the search box layer, which sees keys before the game) ─
@@ -291,7 +470,8 @@ func _sort(grid) -> void:
 	# Merging first only ever frees space, so it can only help the layout fit
 	var merged := _stack(grid)
 	var merged_text := "" if merged == 0 else ", merged %d stack%s" % [merged, "" if merged == 1 else "s"]
-	var items: Array = grid.items.duplicate()
+	# Locked items stay where they are (still placed), the rest pack around them
+	var items: Array = grid.items.filter(func(it): return not is_locked(it))
 	if items.is_empty():
 		return
 	var originals: Array = []
@@ -357,6 +537,8 @@ func _pack(grid, order: Array) -> bool:
 func _stack(grid) -> int:
 	var groups: Dictionary = {}
 	for it in grid.items:
+		if is_locked(it):
+			continue
 		var data = it.slotData.itemData
 		if data.stackable:
 			if not groups.has(data.file):
@@ -399,7 +581,7 @@ func _quick_stack() -> void:
 	var moved := 0
 	var used: Dictionary = {}
 	for it in ui.inventoryGrid.items.duplicate():
-		if not is_instance_valid(it):
+		if not is_instance_valid(it) or is_locked(it):
 			continue
 		for c in targets:
 			var result: int = _deposit_open(it, ui) if c == ui.container else _deposit_storage(it, c)
