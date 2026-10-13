@@ -8,22 +8,59 @@ const FILE_PATH = "user://MCM/ItemClarity"
 
 # [section, key] pairs in definition order, used by the built-in settings panel
 var ordered_keys: Array = []
+var _headings: Array = []  # "Tab: Section" headings in first-use order
 
-# Section headings in the built-in panel's General tab. Kept out of the
-# setting dictionaries themselves so MCM never sees an unknown field.
+# Section of each setting within its tab. _add() folds this into the setting's
+# category as "Tab: Section", which is what both MCM and our panel display.
 const GROUPS = {
 	"colorCodingMode": "Inventory",  "searchBox": "Inventory",
 	"inventoryTools": "Inventory",   "quickStackRange": "Inventory",
 	"tooltipRework": "Tooltips",     "tooltipDelay": "Tooltips",
 	"pricePerSlot": "Tooltips",      "recipeTooltip": "Tooltips",
+	"compareEquipped": "Tooltips",
 	"taskMarking": "Tasks",          "notedTasksOnly": "Tasks",
-	"taskHaveCount": "Tasks",        "taskMarkerCorner": "Tasks",
+	"taskHaveCount": "Tasks",
+	"taskDetailsAlways": "Tasks",
 	"statPreview": "Highlights",     "compatHighlight": "Highlights",
 	"compatHighlightColor": "Highlights",
+	"worldHighlightStyle": "Style",  "worldDotPosition": "Style",
 	"groundHighlight": "Ground Items",          "groundHighlightDistance": "Ground Items",
 	"groundHighlightColor": "Ground Items",     "groundHighlightShelters": "Ground Items",
 	"containerHighlight": "Containers",         "containerHighlightDistance": "Containers",
 	"containerHighlightColor": "Containers",
+	"crosshairMode": "Crosshair",              "crosshairColor": "Crosshair",
+	"crosshairSize": "Crosshair",
+	"icFocusSearch": "Inventory",              "icSort": "Inventory",
+	"icQuickStack": "Inventory",              "icTaskDetails": "Tasks",
+	"catAmmo": "Category Colors",
+	"catArmor": "Category Colors",
+	"catAttachments": "Category Colors",
+	"catBackpacks": "Category Colors",
+	"catBelts": "Category Colors",
+	"catBooks": "Category Colors",
+	"catClothing": "Category Colors",
+	"catConsumables": "Category Colors",
+	"catElectronics": "Category Colors",
+	"catFishing": "Category Colors",
+	"catGrenades": "Category Colors",
+	"catHelmets": "Category Colors",
+	"catInstruments": "Category Colors",
+	"catKeys": "Category Colors",
+	"catKnives": "Category Colors",
+	"catLore": "Category Colors",
+	"catMedical": "Category Colors",
+	"catMisc": "Category Colors",
+	"catRigs": "Category Colors",
+	"catWeapons": "Category Colors",
+	"rarCommon": "Rarity Colors",
+	"rarRare": "Rarity Colors",
+	"rarLegendary": "Rarity Colors",
+	"valueMetric": "Value Colors",
+	"valLow": "Value Colors",
+	"valFair": "Value Colors",
+	"valGood": "Value Colors",
+	"valGreat": "Value Colors",
+	"valTop": "Value Colors",
 }
 
 
@@ -39,8 +76,9 @@ func _ready() -> void:
 		if McmHelpers:
 			McmHelpers.CheckConfigurationHasUpdated(MOD_ID, defaults, FILE_PATH + "/config.ini")
 		_config.load(FILE_PATH + "/config.ini")
-		# Without MCM nobody else adds settings introduced in newer versions
-		if not McmHelpers and merge_defaults(_config, defaults):
+		# Always refresh names, headings and order (keeping values), so both our
+		# panel and MCM pick up layout changes from newer versions
+		if merge_defaults(_config, defaults):
 			_config.save(FILE_PATH + "/config.ini")
 
 	_apply_tooltip_delay(_config)
@@ -59,9 +97,18 @@ func _ready() -> void:
 		_warn_mcm_missing()
 
 
+# Every setting gets "Tab: Section" as its category and its definition order as
+# menu_pos. MCM has no tabs, only headings sorted by the Category entries'
+# menu_pos and settings sorted by their own menu_pos (else alphabetically), so
+# this makes MCM show exactly the built-in panel's structure and order.
 func _add(cfg: ConfigFile, section: String, key: String, data: Dictionary) -> void:
+	if GROUPS.has(key):
+		data["category"] = str(data.get("category", "General")) + ": " + GROUPS[key]
+	data["menu_pos"] = ordered_keys.size() + 1
 	cfg.set_value(section, key, data)
 	ordered_keys.append([section, key])
+	if not _headings.has(data.get("category", "")):
+		_headings.append(data.get("category", ""))
 
 
 # Adds missing settings and refreshes metadata (names, tooltips, options) from
@@ -94,17 +141,19 @@ func merge_defaults(cfg: ConfigFile, defaults: ConfigFile) -> bool:
 
 func build_defaults() -> ConfigFile:
 	ordered_keys = []
+	_headings = []
 	var _config = ConfigFile.new()
 
 	# ── General ───────────────────────────────────────────────────────────────
 	_add(_config, "Dropdown", "colorCodingMode", {
 		"name"    = "Color Coding",
-		"tooltip" = "How to color-code items in your inventory. Category takes priority and uses the colors below. Rarity uses the rarity colors. None disables color coding.",
+		"tooltip" = "How to color-code items in your inventory. Category takes priority and uses the colors below. Rarity uses the rarity colors. Value tints by how valuable an item is compared to everything in the game. None disables color coding.",
 		"default" = 0,
 		"value"   = 0,
 		"options" = [
 			"Category",
 			"Rarity",
+			"Value",
 			"None"
 		],
 		"category" = "General"
@@ -172,6 +221,14 @@ func build_defaults() -> ConfigFile:
 		"category" = "General"
 	})
 
+	_add(_config, "Bool", "compareEquipped", {
+		"name"     = "Compare With Equipped Gear",
+		"tooltip"  = "When hovering gear or a weapon, shows how it differs from what you have equipped in that slot (capacity, protection, insulation, damage, weight). Green is better, red is worse.",
+		"default"  = true,
+		"value"    = true,
+		"category" = "General"
+	})
+
 	_add(_config, "Bool", "taskMarking", {
 		"name"     = "Mark Items Needed for Tasks",
 		"tooltip"  = "Shows a '!' badge on items required for active trader tasks, and lists them in the item tooltip.",
@@ -196,17 +253,11 @@ func build_defaults() -> ConfigFile:
 		"category" = "General"
 	})
 
-	_add(_config, "Dropdown", "taskMarkerCorner", {
-		"name"    = "Task Marker Corner",
-		"tooltip" = "Which corner to place the '!' task marker on items needed for active tasks.",
-		"default" = 3,
-		"value"   = 3,
-		"options" = [
-			"Bottom Right",
-			"Bottom Left",
-			"Top Right",
-			"Top Left"
-		],
+	_add(_config, "Bool", "taskDetailsAlways", {
+		"name"     = "Always Show Task Details",
+		"tooltip"  = "Always list a task's other items (and how many you have) in the tooltip, instead of only while holding the Task Details key (Alt by default).",
+		"default"  = false,
+		"value"    = false,
 		"category" = "General"
 	})
 
@@ -235,6 +286,31 @@ func build_defaults() -> ConfigFile:
 		"category"   = "General"
 	})
 
+
+	# ── World Highlights: Style ────────────────────────────────────────────────
+	_add(_config, "Dropdown", "worldHighlightStyle", {
+		"name"    = "Highlight Style",
+		"tooltip" = "Outline draws a thin edge around ground items and containers. Dot shows a small marker above them instead (uses each one's color at a fixed opacity).",
+		"default" = 0,
+		"value"   = 0,
+		"options" = [
+			"Outline",
+			"Dot"
+		],
+		"category" = "World Highlights"
+	})
+
+	_add(_config, "Dropdown", "worldDotPosition", {
+		"name"    = "Dot Position",
+		"tooltip" = "Where dots sit when Highlight Style is Dot: just above the item or container, or at its center (still hidden behind walls).",
+		"default" = 1,
+		"value"   = 1,
+		"options" = [
+			"Above",
+			"Centered"
+		],
+		"category" = "World Highlights"
+	})
 
 	# ── World Highlights: Ground Items ────────────────────────────────────────
 	_add(_config, "Bool", "groundHighlight", {
@@ -302,6 +378,97 @@ func build_defaults() -> ConfigFile:
 		"category"   = "World Highlights"
 	})
 
+	# ── World Highlights: Crosshair ───────────────────────────────────────────
+	_add(_config, "Dropdown", "crosshairMode", {
+		"name"    = "Crosshair Dot",
+		"tooltip" = "A small dot at the center of the screen so you can see exactly what you're pointing at. 'When Aiming at Items & Containers' only shows it while you're looking at something you can pick up or open.",
+		"default" = 2,
+		"value"   = 2,
+		"options" = [
+			"Off",
+			"Always",
+			"When Aiming at Items & Containers"
+		],
+		"category" = "World Highlights"
+	})
+
+	_add(_config, "Color", "crosshairColor", {
+		"name"       = "Crosshair Color",
+		"tooltip"    = "Color of the crosshair dot. It has a faint dark rim so it stays visible on bright backgrounds.",
+		"default"    = Color(1.0, 1.0, 1.0, 0.85),
+		"value"      = Color(1.0, 1.0, 1.0, 0.85),
+		"allowAlpha" = true,
+		"category"   = "World Highlights"
+	})
+
+	_add(_config, "Float", "crosshairSize", {
+		"name"     = "Crosshair Size (pixels)",
+		"tooltip"  = "Radius of the crosshair dot.",
+		"default"  = 2.5,
+		"value"    = 2.5,
+		"minRange" = 1.0,
+		"maxRange" = 6.0,
+		"step"     = 0.5,
+		"category" = "World Highlights"
+	})
+
+	# ── Keybinds ──────────────────────────────────────────────────────────────
+	_add(_config, "Keycode", "icFocusSearch", {
+		"name"           = "Focus Search",
+		"tooltip"        = "Jumps into the inventory search box while the inventory is open.",
+		"default"        = KEY_SPACE,
+		"value"          = KEY_SPACE,
+		"type"           = "Key",
+		"default_type"   = "Key",
+		"altPressed"     = false,
+		"controlPressed" = false,
+		"metaPressed"    = false,
+		"shiftPressed"   = false,
+		"category"       = "Keybinds"
+	})
+
+	_add(_config, "Keycode", "icSort", {
+		"name"           = "Sort",
+		"tooltip"        = "Sorts (and merges stacks in) your inventory, or the open shelter container if you're hovering it. Unbound by default.",
+		"default"        = 0,
+		"value"          = 0,
+		"type"           = "Key",
+		"default_type"   = "Key",
+		"altPressed"     = false,
+		"controlPressed" = false,
+		"metaPressed"    = false,
+		"shiftPressed"   = false,
+		"category"       = "Keybinds"
+	})
+
+	_add(_config, "Keycode", "icQuickStack", {
+		"name"           = "Quick Stack",
+		"tooltip"        = "In a shelter, runs Quick Stack without clicking the button. Unbound by default.",
+		"default"        = 0,
+		"value"          = 0,
+		"type"           = "Key",
+		"default_type"   = "Key",
+		"altPressed"     = false,
+		"controlPressed" = false,
+		"metaPressed"    = false,
+		"shiftPressed"   = false,
+		"category"       = "Keybinds"
+	})
+
+	_add(_config, "Keycode", "icTaskDetails", {
+		"name"           = "Task Details",
+		"tooltip"        = "Hold while hovering a task item to also list the task's other items and how many of each you have.",
+		"default"        = KEY_ALT,
+		"value"          = KEY_ALT,
+		"type"           = "Key",
+		"default_type"   = "Key",
+		"altPressed"     = false,
+		"controlPressed" = false,
+		"metaPressed"    = false,
+		"shiftPressed"   = false,
+		"category"       = "Keybinds"
+	})
+
 	# ── Category Colors ───────────────────────────────────────────────────────
 	# Alpha controls tint opacity. Transparent (alpha=0) means no color is applied.
 	_add(_config, "Color", "catAmmo", {
@@ -310,7 +477,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catArmor", {
@@ -319,7 +486,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catAttachments", {
@@ -328,7 +495,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catBackpacks", {
@@ -337,7 +504,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catBelts", {
@@ -346,7 +513,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catBooks", {
@@ -355,7 +522,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catClothing", {
@@ -364,7 +531,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catConsumables", {
@@ -373,7 +540,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.90, 0.60, 0.05, 0.15),
 		"value"      = Color(0.90, 0.60, 0.05, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catElectronics", {
@@ -382,7 +549,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catFishing", {
@@ -391,7 +558,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catGrenades", {
@@ -400,7 +567,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.15, 0.65, 0.15, 0.15),
 		"value"      = Color(0.15, 0.65, 0.15, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catHelmets", {
@@ -409,7 +576,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catInstruments", {
@@ -418,7 +585,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catKeys", {
@@ -427,7 +594,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.95, 0.40, 0.70, 0.15),
 		"value"      = Color(0.95, 0.40, 0.70, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catKnives", {
@@ -436,7 +603,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.25, 0.25, 0.25, 0.15),
 		"value"      = Color(0.25, 0.25, 0.25, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catLore", {
@@ -445,7 +612,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catMedical", {
@@ -454,7 +621,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.85, 0.10, 0.10, 0.15),
 		"value"      = Color(0.85, 0.10, 0.10, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catMisc", {
@@ -463,7 +630,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.0, 0.0, 0.0, 0.0),
 		"value"      = Color(0.0, 0.0, 0.0, 0.0),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catRigs", {
@@ -472,7 +639,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.55, 0.15, 0.75, 0.15),
 		"value"      = Color(0.55, 0.15, 0.75, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "catWeapons", {
@@ -481,7 +648,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.25, 0.25, 0.25, 0.15),
 		"value"      = Color(0.25, 0.25, 0.25, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Category Colors"
+		"category"   = "Item Colors"
 	})
 
 	# ── Rarity Colors ─────────────────────────────────────────────────────────
@@ -491,7 +658,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.40, 0.40, 0.40, 0.15),
 		"value"      = Color(0.40, 0.40, 0.40, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Rarity Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "rarRare", {
@@ -500,7 +667,7 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(0.60, 0.20, 0.80, 0.15),
 		"value"      = Color(0.60, 0.20, 0.80, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Rarity Colors"
+		"category"   = "Item Colors"
 	})
 
 	_add(_config, "Color", "rarLegendary", {
@@ -509,14 +676,70 @@ func build_defaults() -> ConfigFile:
 		"default"    = Color(1.00, 0.65, 0.00, 0.15),
 		"value"      = Color(1.00, 0.65, 0.00, 0.15),
 		"allowAlpha" = true,
-		"category"   = "Rarity Colors"
+		"category"   = "Item Colors"
+	})
+
+	# ── Value Colors ──────────────────────────────────────────────────────────
+	_add(_config, "Dropdown", "valueMetric", {
+		"name"    = "Value Measure",
+		"tooltip" = "What 'value' means for Value color coding. Per Slot (item value divided by the slots it takes) is best for deciding what to carry; Total ranks by overall worth regardless of size.",
+		"default" = 0,
+		"value"   = 0,
+		"options" = [
+			"Per Slot",
+			"Total"
+		],
+		"category" = "Item Colors"
+	})
+
+	_add(_config, "Color", "valLow", {
+		"name"       = "Low",
+		"tooltip"    = "Tint for low value items when Color Coding is set to Value. Bottom 40% of items by value.",
+		"default"    = Color(0.45, 0.45, 0.45, 0.15),
+		"value"      = Color(0.45, 0.45, 0.45, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Item Colors"
+	})
+
+	_add(_config, "Color", "valFair", {
+		"name"       = "Fair",
+		"tooltip"    = "Tint for fair value items when Color Coding is set to Value. Next 30% (40th-70th percentile).",
+		"default"    = Color(0.30, 0.75, 0.35, 0.15),
+		"value"      = Color(0.30, 0.75, 0.35, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Item Colors"
+	})
+
+	_add(_config, "Color", "valGood", {
+		"name"       = "Good",
+		"tooltip"    = "Tint for good value items when Color Coding is set to Value. Next 18% (70th-88th percentile).",
+		"default"    = Color(0.25, 0.55, 0.95, 0.15),
+		"value"      = Color(0.25, 0.55, 0.95, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Item Colors"
+	})
+
+	_add(_config, "Color", "valGreat", {
+		"name"       = "Great",
+		"tooltip"    = "Tint for great value items when Color Coding is set to Value. Next 7% (88th-95th percentile).",
+		"default"    = Color(0.65, 0.30, 0.90, 0.15),
+		"value"      = Color(0.65, 0.30, 0.90, 0.15),
+		"allowAlpha" = true,
+		"category"   = "Item Colors"
+	})
+
+	_add(_config, "Color", "valTop", {
+		"name"       = "Elite",
+		"tooltip"    = "Tint for elite value items when Color Coding is set to Value. The most valuable 5% of items in the game.",
+		"default"    = Color(1.00, 0.70, 0.10, 0.18),
+		"value"      = Color(1.00, 0.70, 0.10, 0.18),
+		"allowAlpha" = true,
+		"category"   = "Item Colors"
 	})
 
 	# ── Category ordering ────────────────────────────────────────────────────
-	_config.set_value("Category", "General",         { "menu_pos" = 1 })
-	_config.set_value("Category", "World Highlights", { "menu_pos" = 2 })
-	_config.set_value("Category", "Category Colors", { "menu_pos" = 3 })
-	_config.set_value("Category", "Rarity Colors",   { "menu_pos" = 4 })
+	for i in _headings.size():
+		_config.set_value("Category", _headings[i], { "menu_pos" = i + 1 })
 
 	return _config
 

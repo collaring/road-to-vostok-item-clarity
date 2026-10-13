@@ -16,6 +16,9 @@ var _game_data: Resource = null
 var _counts: Dictionary = {}      # resource_path -> int
 var _counted_at: int = -CACHE_TIME_MS
 var _shelter_cache: Dictionary = {}  # file path -> {"mtime": int, "counts": Dictionary}
+var _files: PackedStringArray = []  # user:// listing, refreshed every FILES_CACHE_MS
+var _files_at: int = -100000
+const FILES_CACHE_MS = 10000
 var _world: Dictionary = {}  # instance id -> LootContainer / Pickup, fed by Main
 
 
@@ -32,6 +35,16 @@ func get_count(path: String) -> int:
 func track(node: Node) -> void:
 	if node is LootContainer or node is Pickup:
 		_world[node.get_instance_id()] = node
+
+
+# Listing user:// hits the disk, so reuse it for a while; each file's mtime is
+# still checked on every recount, so edits to existing saves show up at once
+func _save_files() -> PackedStringArray:
+	var now := Time.get_ticks_msec()
+	if now - _files_at > FILES_CACHE_MS:
+		_files_at = now
+		_files = DirAccess.get_files_at("user://")
+	return _files
 
 
 func invalidate() -> void:
@@ -74,7 +87,7 @@ func _recount() -> void:
 		_count_live_shelter(ui)
 
 	# Every other shelter: from save files
-	for file in DirAccess.get_files_at("user://"):
+	for file in _save_files():
 		if not file.ends_with(".tres"):
 			continue
 		if file.get_basename() == current_shelter:

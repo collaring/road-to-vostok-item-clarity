@@ -10,6 +10,7 @@ extends CanvasLayer
 # The LineEdit itself is moved into the game's Interface, just before the
 # tooltip, so it draws above the inventory but underneath tooltips.
 
+const KeyUtil = preload("res://ItemClarity/Scripts/KeyUtil.gd")
 const HIGHLIGHT_NODE_NAME = "_icc_search"
 const DIM_ALPHA = 0.25
 
@@ -30,6 +31,12 @@ var _affected: Array = []        # item nodes we changed (outline or dim)
 var _tokens: PackedStringArray = []
 var _haystacks: Dictionary = {}  # resource_path -> normalized search text
 var _suspended: Dictionary = {}  # action -> Array[InputEventKey] removed while typing
+
+# Keybinds (MCM Keycode format, see KeyUtil). This layer gets input before the
+# game, so it also runs the inventory hotkeys: [bind, Callable] pairs from Main.
+var focus_bind: Dictionary = KeyUtil.make_bind(KEY_SPACE)
+var hotkeys: Array = []
+var capturing := false  # settings panel is waiting for a new keybind: stay out of the way
 
 
 func _ready() -> void:
@@ -169,6 +176,17 @@ func _is_inventory_open() -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	if capturing:
+		return
+	var typing: bool = _edit != null and is_instance_valid(_edit) and _edit.has_focus()
+	# Inventory hotkeys (Sort, Quick Stack) work even with the search box off
+	if not typing and event is InputEventKey and _is_inventory_open() and not _other_text_focused():
+		for pair in hotkeys:
+			if KeyUtil.matches(event, pair[0]):
+				get_viewport().set_input_as_handled()
+				KeyUtil.cancel_press(event)
+				pair[1].call()
+				return
 	if _edit == null or not is_instance_valid(_edit) or not _edit.is_visible_in_tree():
 		return
 	if event is InputEventMouseButton and event.pressed and _edit.has_focus():
@@ -178,14 +196,10 @@ func _input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
 		return
 	if not _edit.has_focus():
-		# Space jumps into the search box
-		if event.pressed and not event.echo and event.keycode == KEY_SPACE \
-				and not (event.ctrl_pressed or event.alt_pressed or event.shift_pressed or event.meta_pressed):
-			var focused = get_viewport().gui_get_focus_owner()
-			if focused is LineEdit or focused is TextEdit:
-				return
+		# The Focus Search keybind (Space by default) jumps into the search box
+		if KeyUtil.matches(event, focus_bind) and not _other_text_focused():
 			get_viewport().set_input_as_handled()
-			_cancel_press(event)
+			KeyUtil.cancel_press(event)
 			_edit.grab_focus()
 			_edit.caret_column = _edit.text.length()
 		return
@@ -219,27 +233,12 @@ func _input(event: InputEvent) -> void:
 # enough. While the box is focused, keyboard bindings are removed from the
 # InputMap so typed keys match no action; they're restored on focus loss.
 func _suspend_key_bindings() -> void:
-	if not _suspended.is_empty():
-		return
-	for action in InputMap.get_actions():
-		if str(action).begins_with("ui_"):
-			continue  # LineEdit-style editor actions, not game controls
-		var keys: Array = []
-		for ev in InputMap.action_get_events(action):
-			if ev is InputEventKey:
-				keys.append(ev)
-		if not keys.is_empty():
-			_suspended[action] = keys
-			for ev in keys:
-				InputMap.action_erase_event(action, ev)
+	if _suspended.is_empty():
+		_suspended = KeyUtil.suspend_bindings()
 
 
 func _restore_key_bindings() -> void:
-	for action in _suspended:
-		if InputMap.has_action(action):
-			for ev in _suspended[action]:
-				if not InputMap.action_has_event(action, ev):
-					InputMap.action_add_event(action, ev)
+	KeyUtil.restore_bindings(_suspended)
 	_suspended = {}
 
 
@@ -247,12 +246,9 @@ func _exit_tree() -> void:
 	_restore_key_bindings()
 
 
-# A press that already reached Input (Space opening the box) is undone by
-# feeding Input the matching release while the bindings still exist
-func _cancel_press(event: InputEventKey) -> void:
-	var release: InputEventKey = event.duplicate()
-	release.pressed = false
-	Input.parse_input_event(release)
+func _other_text_focused() -> bool:
+	var focused = get_viewport().gui_get_focus_owner()
+	return (focused is LineEdit or focused is TextEdit) and focused != _edit
 
 
 func _set_text(text: String) -> void:

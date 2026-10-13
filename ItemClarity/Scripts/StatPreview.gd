@@ -49,8 +49,9 @@ func _get_interface() -> Node:
 func _process(_delta: float) -> void:
 	var ui = _get_interface()
 	if ui == null or not ui.visible or not ("characterUI" in ui) or not ui.characterUI.is_visible_in_tree():
-		_clear_preview()
-		if compat:
+		if _previewing != null:
+			_clear_preview()
+		if compat and compat.stat_filter != "":
 			compat.stat_filter = ""
 		return
 	_refresh_vitals(ui.characterUI)

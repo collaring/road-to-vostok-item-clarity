@@ -39,6 +39,9 @@ var enabled := true
 var quick_range := 6.0
 var interface: Node = null    # set by Main
 var counter: Node = null      # ItemCounter: knows the LootContainers in the world
+var ground: Node = null       # GroundHighlight: marks the containers Quick Stack filled
+const FLASH_COLOR = Color(0.45, 1.0, 0.55, 0.75)
+const FLASH_LINGER = 4.0      # seconds after the inventory closes
 
 var _game_data: Resource = null
 var _inv_row: HBoxContainer = null
@@ -204,6 +207,32 @@ func _covered_rect(node: Node, acc: Rect2) -> Rect2:
 	for child in node.get_children():
 		acc = _covered_rect(child, acc)
 	return acc
+
+
+# ── Hotkeys (called by the search box layer, which sees keys before the game) ─
+
+# Sorts the open shelter container if you're hovering it, else your inventory
+func sort_hotkey() -> void:
+	var ui = _get_interface()
+	if not enabled or ui == null:
+		return
+	if _busy():
+		ui.PlayError()
+		return
+	if _in_shelter() and ui.container and "hoverGrid" in ui and ui.hoverGrid == ui.containerGrid:
+		_sort(ui.containerGrid)
+	else:
+		_sort(ui.inventoryGrid)
+
+
+func quick_stack_hotkey() -> void:
+	var ui = _get_interface()
+	if not enabled or ui == null or not _in_shelter():
+		return
+	if _busy():
+		ui.PlayError()
+		return
+	_quick_stack()
 
 
 # ── State helpers ────────────────────────────────────────────────────────────
@@ -382,6 +411,8 @@ func _quick_stack() -> void:
 	if moved > 0 or not used.is_empty():
 		ui.PlayStack()
 		ui.UpdateStats(false)
+		if ground and is_instance_valid(ground):
+			ground.set_marks("quickstack", used.keys(), FLASH_COLOR, FLASH_LINGER)
 		if counter:
 			counter.invalidate()
 		_say("Quick stacked %d item%s into %d container%s" % [
