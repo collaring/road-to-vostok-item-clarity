@@ -5,6 +5,7 @@ var McmHelpers = load("res://ModConfigurationMenu/Scripts/Doink Oink/MCM_Helpers
 
 const MOD_ID = "ItemClarity"
 const FILE_PATH = "user://MCM/ItemClarity"
+const ConfigPath = preload("res://ItemClarity/Scripts/ConfigPath.gd")
 
 # [section, key] pairs in definition order, used by the built-in settings panel
 var ordered_keys: Array = []
@@ -70,19 +71,30 @@ const GROUPS = {
 func _ready() -> void:
 	var defaults = build_defaults()
 	var _config = ConfigFile.new()
+	# config.ini, or "<profile>.ini" under a mod-loader profile (as MCM does)
+	var path: String = ConfigPath.path()
+	var default_path: String = FILE_PATH + "/" + ConfigPath.DEFAULT_FILE
 
-	if !FileAccess.file_exists(FILE_PATH + "/config.ini"):
+	# First run on a profile: start from the existing config.ini so current
+	# choices carry over (MCM copies it the same way)
+	if !FileAccess.file_exists(path) and path != default_path and FileAccess.file_exists(default_path):
+		var base = ConfigFile.new()
+		if base.load(default_path) == OK:
+			DirAccess.make_dir_recursive_absolute(FILE_PATH)
+			base.save(path)
+
+	if !FileAccess.file_exists(path):
 		DirAccess.make_dir_recursive_absolute(FILE_PATH)
-		defaults.save(FILE_PATH + "/config.ini")
+		defaults.save(path)
 		_config = defaults
 	else:
 		if McmHelpers:
-			McmHelpers.CheckConfigurationHasUpdated(MOD_ID, defaults, FILE_PATH + "/config.ini")
-		_config.load(FILE_PATH + "/config.ini")
+			McmHelpers.CheckConfigurationHasUpdated(MOD_ID, defaults, path)
+		_config.load(path)
 		# Always refresh names, headings and order (keeping values), so both our
 		# panel and MCM pick up layout changes from newer versions
 		if merge_defaults(_config, defaults):
-			_config.save(FILE_PATH + "/config.ini")
+			_config.save(path)
 
 	_apply_tooltip_delay(_config)
 
@@ -92,9 +104,7 @@ func _ready() -> void:
 			"Item Clarity",
 			FILE_PATH,
 			"Color codes items by category or rarity, and marks items needed for active trader tasks.",
-			{
-				"config.ini" = _on_config_saved
-			}
+			_save_callbacks()
 		)
 	else:
 		_warn_mcm_missing()
@@ -800,6 +810,14 @@ func build_defaults() -> ConfigFile:
 		_config.set_value("Category", _headings[i], { "menu_pos" = i + 1 })
 
 	return _config
+
+
+# MCM reports saves by file name: config.ini on the default profile (it uses
+# the first key here), "<profile>.ini" on any other
+func _save_callbacks() -> Dictionary:
+	var callbacks := {ConfigPath.DEFAULT_FILE: _on_config_saved}
+	callbacks[ConfigPath.file_name()] = _on_config_saved
+	return callbacks
 
 
 # Called by MCM whenever the player saves changes in the configuration menu

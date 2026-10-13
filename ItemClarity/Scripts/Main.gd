@@ -2,7 +2,8 @@ extends Node
 
 const OVERLAY_NODE_NAME = "_icc_border"
 const TASK_ICON_NODE_NAME = "_icc_task"
-const CONFIG_PATH = "user://MCM/ItemClarity/config.ini"
+# config.ini, or "<profile>.ini" under a mod-loader profile (MCM's file)
+var CONFIG_PATH: String = preload("res://ItemClarity/Scripts/ConfigPath.gd").path()
 
 # task_needed_paths: resource_path -> Array of {"count": 2, "text": "Gunsmith: Warm Meal"}
 var _task_needed_paths: Dictionary = {}
@@ -32,7 +33,7 @@ var _hovered_price_text: String = ""  # cached price-per-slot string for current
 
 # Cached config — loaded once on ready, refreshed by MCM on save
 var _conf: Dictionary = {}
-var _config_mtime: int = -1       # last-seen modification time of config.ini
+var _config_mtime: int = -1       # last-seen modification time of the settings file
 var _traders_mtime: int = -1     # last-seen modification time of Traders.tres
 var _traders_os_path: String = "" # resolved OS path cached at startup
 

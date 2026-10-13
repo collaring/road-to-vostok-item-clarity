@@ -3,7 +3,7 @@ extends CanvasLayer
 # Built-in settings window, so the mod is fully configurable without MCM.
 # Reads and writes the same MCM-format config.ini, so both menus stay in sync.
 
-const CONFIG_PATH = "user://MCM/ItemClarity/config.ini"
+var CONFIG_PATH: String = preload("res://ItemClarity/Scripts/ConfigPath.gd").path()  # same file MCM uses
 const SECTIONS = ["Bool", "Dropdown", "Float", "Color", "Keycode"]
 const KeyUtil = preload("res://ItemClarity/Scripts/KeyUtil.gd")
 

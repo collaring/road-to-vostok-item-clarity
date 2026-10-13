@@ -367,6 +367,9 @@ func _item_eligible(pickup: Node) -> bool:
 func _container_eligible(container: Node) -> bool:
 	if container.locked or container.furniture or container.storaged:
 		return false
+	# Shelter containers are your own storage (Office Cabinets lack the furniture flag)
+	if _game_data and "shelter" in _game_data and _game_data.shelter:
+		return false
 	if not container.is_visible_in_tree():
 		return false
 	if interface and is_instance_valid(interface) and "container" in interface and interface.container == container:
